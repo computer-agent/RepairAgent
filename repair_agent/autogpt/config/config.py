@@ -283,7 +283,7 @@ class ConfigBuilder(Configurable[Config]):
             "plugins_config_file": os.getenv(
                 "PLUGINS_CONFIG_FILE", PLUGINS_CONFIG_FILE
             ),
-            "chat_messages_enabled": os.getenv("CHAT_MESSAGES_ENABLED") == "True",
+            "chat_messages_enabled": os.getenv("CHAT_MESSAGES_ENABLED", "True") == "True",
         }
 
         config_dict["disabled_command_categories"] = _safe_split(
