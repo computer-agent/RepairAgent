@@ -160,6 +160,9 @@ class Config(SystemSettings, arbitrary_types_allowed=True):
                     f"Model {smart_llm} does not support OpenAI Functions. "
                     "Please disable OPENAI_FUNCTIONS or choose a suitable model."
                 )
+        # A pydantic v1 validator's return value REPLACES the field value. Without
+        # this return the flag would silently collapse to None whenever it is set.
+        return v
 
     def get_openai_credentials(self, model: str) -> dict[str, str]:
         credentials = {

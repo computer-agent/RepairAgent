@@ -42,8 +42,22 @@ def preprocess_paths(agent, project_name, bug_index, filepath):
         
         if len(files_index) == 1:
             filepath = files_index[0]
-        elif len(files_index) >= 1:
-            raise ValueError("Multiple Candidate Paths. We do not handle this yet!")
+        elif len(files_index) > 1:
+            # Prefer an exact path-suffix match before giving up, so e.g.
+            # "Foo.java" resolves cleanly even when "FooBar.java" also matches.
+            exact = [f for f in files_index if f == filepath or f.endswith("/" + filepath)]
+            if len(exact) == 1:
+                filepath = exact[0]
+            else:
+                # Return an actionable message (same convention as the
+                # not-found case) instead of raising, which would crash the
+                # whole command/agent loop.
+                return (
+                    "The filepath {} is ambiguous; candidate paths: {}. "
+                    "Please call the command again with the full path.".format(
+                        filepath, ", ".join(files_index[:10])
+                    )
+                )
         else:
             return "The filepath {} does not exist.".format(filepath)
     return filepath
@@ -52,10 +66,14 @@ def parse_buggy_lines(buggy_lines):
     parsed_lines = {}
     for line in buggy_lines:
         splitted_line = line.split("#")
-        if splitted_line[0] in parsed_lines:
-            parsed_lines[splitted_line[0]].append((splitted_line[1], splitted_line[2]))
-        else:
-            parsed_lines[splitted_line[0]] = [(splitted_line[1], splitted_line[2])]
+        # Expected format: <file_path>#<line_number>#<code>. Skip malformed
+        # entries instead of raising IndexError, and rejoin so that code
+        # containing '#' is preserved rather than truncated at the third token.
+        if len(splitted_line) < 3:
+            continue
+        file_path, line_number = splitted_line[0], splitted_line[1]
+        code = "#".join(splitted_line[2:])
+        parsed_lines.setdefault(file_path, []).append((line_number, code))
     return parsed_lines
 
 def create_fix_template(project_name, bug_number):
@@ -755,6 +773,11 @@ def search_code_base(project_name:str, bug_index:str, key_words: list, agent: Ag
 def extract_root_cause(info):
     separator = "--------------------------------------------------------------------------------"
     start_cause = info.find("Root cause")
+    # Guard the marker-absent case explicitly rather than relying on a negative
+    # index from find()==-1 (which happens to collapse to ""). Behavior for the
+    # marker-present cases is unchanged.
+    if start_cause == -1:
+        return ""
     end_cause = info[start_cause:].find(separator)
     root_cause = info[start_cause:start_cause+end_cause]
     return root_cause
@@ -1112,7 +1135,9 @@ def extract_function_calls(java_code):
     # Find all matches in the Java code
     matches = pattern.findall(java_code)
 
-    logger.info(list(set(matches)))
+    # str(...) because the project's custom logger formatter regex-processes the
+    # message and raises TypeError on a non-string (e.g. a list).
+    logger.info(str(list(set(matches))))
     # Print the matches
     return [match for match in matches]
 

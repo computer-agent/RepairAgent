@@ -57,7 +57,11 @@ def extract_dict_from_response(response_content: str) -> dict[str, Any]:
     except BaseException:
         pass
 
-    logger.debug(f"Could not parse response as dict: {response_content[:200]}")
+    # Surface this as a warning, not debug: a model whose output cannot be parsed
+    # into a command dict produces a no-op cycle, which is a common cause of the
+    # agent looping without making progress (especially with non-OpenAI / Azure
+    # deployments that do not reliably honor response_format=json_object).
+    logger.warn(f"Could not parse model response as dict: {response_content[:200]}")
     return {}
 
 

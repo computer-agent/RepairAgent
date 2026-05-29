@@ -93,7 +93,9 @@ class Agent(BaseAgent):
                     else ""
                 ),
             )
-            logger.debug(budget_msg)
+            # .content because the custom logger formatter regex-processes the
+            # message and raises TypeError on a non-string (Message) object.
+            logger.debug(budget_msg.content)
 
             if kwargs.get("append_messages") is None:
                 kwargs["append_messages"] = []
@@ -225,9 +227,19 @@ class Agent(BaseAgent):
             )
 
         if "command" not in assistant_reply_dict:
+            logger.warn(
+                "No 'command' key in the parsed model response — substituting "
+                "missing_command. The model likely did not return a valid JSON "
+                "command (common with non-OpenAI/Azure deployments that don't "
+                "honor response_format=json_object). Repeated occurrences usually "
+                "explain an agent that loops without making progress."
+            )
             assistant_reply_dict["command"] = {"name": "missing_command", "args":{}}
         command_dict = assistant_reply_dict["command"]
         if not isinstance(command_dict, dict):
+            logger.warn(
+                "Parsed 'command' is not a dict — substituting unknown_command."
+            )
             assistant_reply_dict["command"] = {"name": "unknown_command", "args":{}}
             command_dict = assistant_reply_dict["command"]
 

@@ -31,6 +31,28 @@ from .token_counter import *
 # wasteful try→fail→retry cycle on every subsequent request to the same model.
 _REASONING_MODELS: set[str] = set()
 
+# Name fragments for OpenAI "reasoning"/newer models that reject `max_tokens`,
+# `temperature`, and `response_format` (they require `max_completion_tokens`).
+# Matching on the name lets us get the FIRST call right instead of relying on a
+# failed round-trip — important on Azure OpenAI, where the error wording differs
+# from public OpenAI and the wording-based fallback below may not match.
+_REASONING_MODEL_PREFIXES = ("o1", "o3", "o4", "gpt-5")
+
+
+def _looks_like_reasoning_model(model: str) -> bool:
+    name = (model or "").lower()
+    return name.startswith(_REASONING_MODEL_PREFIXES) or "gpt-5" in name
+
+
+def _apply_reasoning_model_kwargs(chat_completion_kwargs: dict) -> None:
+    """In-place: rewrite kwargs into the form newer/reasoning models accept."""
+    if "max_tokens" in chat_completion_kwargs:
+        chat_completion_kwargs["max_completion_tokens"] = chat_completion_kwargs.pop(
+            "max_tokens"
+        )
+    chat_completion_kwargs.pop("temperature", None)
+    chat_completion_kwargs.pop("response_format", None)
+
 
 def call_ai_function(
     function: str,
@@ -184,11 +206,10 @@ def create_chat_completion(
                 function.schema for function in functions
             ]
 
-        if model in _REASONING_MODELS:
-            # Known reasoning model: go straight to the compatible kwargs.
-            chat_completion_kwargs["max_completion_tokens"] = chat_completion_kwargs.pop("max_tokens")
-            chat_completion_kwargs.pop("temperature", None)
-            chat_completion_kwargs.pop("response_format", None)
+        if model in _REASONING_MODELS or _looks_like_reasoning_model(model):
+            # Known/likely reasoning model: go straight to the compatible kwargs.
+            _REASONING_MODELS.add(model)
+            _apply_reasoning_model_kwargs(chat_completion_kwargs)
 
         try:
             response = iopenai.create_chat_completion(
@@ -196,17 +217,27 @@ def create_chat_completion(
                 **chat_completion_kwargs,
             )
         except openai.error.InvalidRequestError as e:
-            err = str(e)
-            if "max_tokens" in err and "max_completion_tokens" in err:
-                # Newer models (o1, o3, gpt-5-*…) use max_completion_tokens.
-                # Cache so subsequent calls skip this path.
+            err = str(e).lower()
+            # Newer models (o1, o3, gpt-5-*, …) reject `max_tokens`, `temperature`
+            # and `response_format`. The exact error wording differs between
+            # public OpenAI and Azure OpenAI, so match on any of the tell-tale
+            # signals rather than one fixed phrase, then retry once with the
+            # reasoning-model kwargs. The `max_completion_tokens` guard ensures we
+            # only retry when we have NOT already converted the kwargs.
+            param_incompatibility = (
+                "max_completion_tokens" in err
+                or ("max_tokens" in err and ("unsupported" in err or "not supported" in err))
+                or ("temperature" in err and ("unsupported" in err or "not support" in err))
+                or ("response_format" in err and ("unsupported" in err or "not support" in err))
+            )
+            if param_incompatibility and "max_completion_tokens" not in chat_completion_kwargs:
+                # Cache so subsequent calls skip the failed round-trip.
                 _REASONING_MODELS.add(model)
-                logger.debug(
-                    f"Model {model} requires max_completion_tokens; caching and retrying."
+                logger.warn(
+                    f"Model {model} rejected standard parameters ({e}); retrying "
+                    f"with max_completion_tokens and without temperature/response_format."
                 )
-                chat_completion_kwargs["max_completion_tokens"] = chat_completion_kwargs.pop("max_tokens")
-                chat_completion_kwargs.pop("temperature", None)
-                chat_completion_kwargs.pop("response_format", None)
+                _apply_reasoning_model_kwargs(chat_completion_kwargs)
                 response = iopenai.create_chat_completion(
                     messages=prompt.raw(),
                     **chat_completion_kwargs,

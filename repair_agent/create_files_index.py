@@ -7,7 +7,10 @@ def list_java_files(main_dir) -> list:
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.endswith(".java"):
-                java_files.append(os.path.join(root.replace("{}/".format(main_dir), ""), file))
+                # relpath gives a path relative to main_dir for ALL files; the old
+                # str.replace only stripped the prefix for files in subdirectories,
+                # leaving top-level files with an absolute path.
+                java_files.append(os.path.relpath(os.path.join(root, file), main_dir))
 
     return java_files
 
