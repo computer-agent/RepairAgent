@@ -154,3 +154,38 @@ def test_validate_dict_debug_mode_still_returns_errors():
     ok, errors = validate_dict(obj, _cfg(debug_mode=True))
     assert ok is False
     assert isinstance(errors, list) and errors
+
+
+# --------------------------------------------------------------------------- #
+# extract_dict_from_response — robustness against realistic LLM formatting.
+# These reveal bugs in the fragile fence-slicing logic: the whole agent loop
+# depends on recovering the {"thoughts":.., "command":..} object, and returning
+# {} or a truncated dict causes a no-op cycle (the issue #21 looping symptom).
+# --------------------------------------------------------------------------- #
+def test_real_json_in_second_code_block_is_recovered():
+    # An illustrative block precedes the real answer block.
+    resp = (
+        "For example you could do:\n```\nsome illustrative non-json text\n```\n"
+        "But here is my actual answer:\n```json\n"
+        '{"thoughts": "ok", "command": {"name": "read_file", "args": {"path": "Foo.java"}}}\n```'
+    )
+    assert extract_dict_from_response(resp) == {
+        "thoughts": "ok",
+        "command": {"name": "read_file", "args": {"path": "Foo.java"}},
+    }
+
+
+def test_triple_backtick_inside_string_value_does_not_truncate():
+    resp = '```json\n{"thoughts": "use ```code``` here", "command": {"name": "x", "args": {}}}\n```'
+    assert extract_dict_from_response(resp) == {
+        "thoughts": "use ```code``` here",
+        "command": {"name": "x", "args": {}},
+    }
+
+
+def test_json_on_same_line_as_opening_fence_is_recovered():
+    resp = '```json {"thoughts": "ok", "command": {"name": "x", "args": {}}}```'
+    assert extract_dict_from_response(resp) == {
+        "thoughts": "ok",
+        "command": {"name": "x", "args": {}},
+    }

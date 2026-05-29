@@ -13,49 +13,76 @@ from autogpt.logs import logger
 LLM_DEFAULT_RESPONSE_FORMAT = "llm_response_format_1"
 
 
+def _iter_balanced_objects(text: str):
+    """Yield each top-level balanced ``{...}`` substring of ``text``.
+
+    String-literal aware: braces (and backticks, newlines, ``` fences) that
+    appear inside a JSON string value are ignored, so an opening ``` fence on
+    the same line, multiple code blocks, and ``` inside a value do not derail
+    extraction. Nested objects are part of the enclosing top-level object, not
+    yielded separately.
+    """
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == "{":
+            depth = 0
+            in_str = False
+            esc = False
+            for j in range(i, n):
+                c = text[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif c == "\\":
+                        esc = True
+                    elif c == '"':
+                        in_str = False
+                else:
+                    if c == '"':
+                        in_str = True
+                    elif c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            yield text[i:j + 1]
+                            i = j
+                            break
+            else:
+                # No matching close brace; nothing more to find.
+                return
+        i += 1
+
+
 def extract_dict_from_response(response_content: str) -> dict[str, Any]:
-    # Sometimes the response includes the JSON in a code block with ```
-    start_triple_quote = response_content.find("```")
-    if start_triple_quote != -1:
-        response_content = response_content[start_triple_quote:]
-        end_triple_quote = response_content[3:].find("```")
-        if end_triple_quote != -1:
-            response_content = response_content[:end_triple_quote+3]
-            if response_content.startswith('json'):
-                response_content = response_content[4:]
-            response_content = "\n".join(response_content.split("\n")[1:])
-            
-        """if response_content.startswith("```") and response_content.endswith("```"):
-            response_content = response_content.split("\n")[1:]
-            for i in range(len(response_content)-1, 0, -1):
-                if response_content[i]=="```":
-                    response_content = response_content[:i]
-                    break
-            response_content = "\n".join(response_content)"""
-            # Discard the first and last ```, then re-join in case the response naturally included ```
-            #response_content = "```".join(response_content.split("```")[1:-1])
-
-    # Repair malformed JSON before parsing (trailing commas, single quotes, etc.)
-    response_content = repair_json(response_content)
-
     if not response_content or not response_content.strip():
         return {}
 
-    # Try json.loads first (handles null/true/false correctly).
-    # Fall back to ast.literal_eval for Python-dict-style responses (single quotes, etc.).
-    try:
-        result = json.loads(response_content)
-        if isinstance(result, dict):
-            return result
-    except json.JSONDecodeError:
-        pass
+    # Try each balanced {...} object found in the text (this transparently
+    # handles fenced code blocks, surrounding prose, multiple blocks, and
+    # backticks/newlines inside string values), then fall back to repairing the
+    # whole response. The first candidate that parses to a non-empty dict wins.
+    candidates = list(_iter_balanced_objects(response_content))
+    candidates.append(response_content)
 
-    try:
-        result = ast.literal_eval(response_content)
-        if isinstance(result, dict):
-            return result
-    except BaseException:
-        pass
+    for candidate in candidates:
+        repaired = repair_json(candidate)
+        if not repaired or not repaired.strip():
+            continue
+        # Try json.loads first (handles null/true/false correctly), then fall
+        # back to ast.literal_eval for Python-dict-style responses.
+        try:
+            result = json.loads(repaired)
+            if isinstance(result, dict) and result:
+                return result
+        except json.JSONDecodeError:
+            pass
+        try:
+            result = ast.literal_eval(repaired)
+            if isinstance(result, dict) and result:
+                return result
+        except BaseException:
+            pass
 
     # Surface this as a warning, not debug: a model whose output cannot be parsed
     # into a command dict produces a no-op cycle, which is a common cause of the
