@@ -1130,7 +1130,9 @@ def extract_function_calls(java_code):
 
     java_code = remove_comments(java_code)
     # Define a pattern to match function or method calls, excluding if and while conditions
-    pattern = re.compile(r'\b(?:(?!if|while)\w+\s*\(.*?\))')
+    # Exclude only the `if`/`while` control-flow keywords (whole words), not
+    # method calls that merely start with those letters (e.g. ifPresent(...)).
+    pattern = re.compile(r'\b(?!(?:if|while)\b)\w+\s*\(.*?\)')
 
     # Find all matches in the Java code
     matches = pattern.findall(java_code)
@@ -1406,7 +1408,9 @@ def apply_changes(change_dict):
     line_offset = 0
     from operator import itemgetter
 
-    sorted_insertions = sorted(insertions, key=itemgetter('line_number')) 
+    # Sort numerically — line numbers may arrive as strings, and lexicographic
+    # order would place "10" before "2", misplacing the inserted lines.
+    sorted_insertions = sorted(insertions, key=lambda ins: int(ins.get("line_number", 0)))
     for insertion in sorted_insertions:
         line_number = int(insertion.get("line_number", 0)) + line_offset
         for new_line in insertion.get("new_lines", []):
@@ -1444,5 +1448,13 @@ def get_list_of_buggy_lines(name, index):
             bug_lines = buggy_lines_file.read().splitlines()
         lines = []
         for bl in bug_lines:
-            lines.append(int(bl.split("#")[-2]))
+            # Format: <path>#<line_number>#<code>. The line number is field 1;
+            # using [-2] breaks when the code contains '#'. Skip malformed lines.
+            parts = bl.split("#")
+            if len(parts) < 2:
+                continue
+            try:
+                lines.append(int(parts[1]))
+            except ValueError:
+                continue
         return lines

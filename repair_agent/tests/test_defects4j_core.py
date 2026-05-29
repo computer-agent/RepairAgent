@@ -977,3 +977,37 @@ def test_extract_test_code_function_not_in_file(buggy_project_dir):
     out = d.extract_test_code(b.project_name, b.bug_index, "FooTest.java", b.agent)
     # function "missingFunc" not found -> 'public void missingFunc' index == -1
     assert out is None
+
+
+# ===========================================================================
+# Bug-hunt regressions (Tier 2).
+# ===========================================================================
+def test_get_list_of_buggy_lines_hash_in_code(tmp_path, monkeypatch):
+    # Format is path#lineno#code; code may contain '#'. Must return the line
+    # number (field 1), not crash via split('#')[-2].
+    bdir = tmp_path / "defects4j" / "buggy-lines"
+    bdir.mkdir(parents=True)
+    (bdir / "Lang-7.buggy.lines").write_text("src/Foo.java#10#a # b\nsrc/Foo.java#20#x = 1\n")
+    monkeypatch.chdir(tmp_path)
+    assert d.get_list_of_buggy_lines("Lang", "7") == [10, 20]
+
+
+def test_extract_function_calls_keeps_prefixed_identifiers():
+    code = "void m(){ if (x>0) {} ifPresent(1); whileLoop(2); foo(3); }"
+    calls = d.extract_function_calls(code)
+    joined = " ".join(calls)
+    assert "ifPresent(1)" in joined   # method call, not the `if` keyword
+    assert "whileLoop(2)" in joined
+    assert "foo(3)" in joined
+
+
+def test_apply_changes_insertions_sorted_numerically(tmp_path):
+    f = tmp_path / "F.java"
+    f.write_text("".join(f"L{i}\n" for i in range(1, 11)))  # L1..L10
+    d.apply_changes({"file_name": str(f), "insertions": [
+        {"line_number": "10", "new_lines": ["INS10\n"]},
+        {"line_number": "2", "new_lines": ["INS2\n"]},
+    ]})
+    lines = f.read_text().splitlines()
+    # INS2 must be inserted before original L2 (numeric order), not after L10.
+    assert lines[1] == "INS2"
