@@ -588,7 +588,10 @@ def get_bug_count(project: str) -> int:
     patches_dir = SCRIPT_DIR / "defects4j" / "framework" / "projects" / project / "patches"
     if not patches_dir.exists():
         return 0
-    return len([p for p in patches_dir.iterdir() if p.suffix == ".src"])
+    # Defects4J names its patch files "<id>.src.patch" (one per bug) alongside
+    # "<id>.test.patch". Path.suffix of "1.src.patch" is ".patch", so the old
+    # `p.suffix == ".src"` check matched nothing and always returned 0.
+    return len([p for p in patches_dir.iterdir() if p.name.endswith(".src.patch")])
 
 
 def parse_bugs_string(bugs_str: str) -> list[tuple[str, str]]:
