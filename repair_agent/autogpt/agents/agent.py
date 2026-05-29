@@ -256,13 +256,23 @@ class Agent(BaseAgent):
                         new_command_dict["args"][k] = command_dict["args"][k]
                 
                 unmatched_args = [arg for arg in command_args if arg not in ref_args]
-                unmatched_ref = [arg for arg in ref_args if arg not in list(new_command_dict["args"].keys())]
+                available_refs = [arg for arg in ref_args if arg not in new_command_dict["args"]]
 
                 for uarg in unmatched_args:
-                    for uref in unmatched_ref:
-                        if uarg in uref:
-                            new_command_dict["args"][uref] = command_dict["args"][uarg]
-                            break
+                    # Pick the MOST specific available ref: exact match, else a ref
+                    # whose name ends with the arg (so "name" -> "method_name", not
+                    # "project_name"), else any ref containing it; on ties prefer the
+                    # shortest. Consume the chosen ref so two args can't collapse onto
+                    # one (which would silently drop a value).
+                    candidates = (
+                        [r for r in available_refs if r == uarg]
+                        or [r for r in available_refs if r.endswith(uarg)]
+                        or [r for r in available_refs if uarg in r]
+                    )
+                    if candidates:
+                        chosen = min(candidates, key=len)
+                        new_command_dict["args"][chosen] = command_dict["args"][uarg]
+                        available_refs.remove(chosen)
                 
                 if "project_name" in new_command_dict["args"]:
                     if "_" in new_command_dict["args"]["project_name"]:

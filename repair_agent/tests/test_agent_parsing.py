@@ -358,3 +358,30 @@ def test_parse_unmatched_arg_mapped_to_substring_ref(parse_self):
 def test_parse_empty_content_raises_syntaxerror(parse_self):
     with pytest.raises(SyntaxError):
         Agent.parse_and_process_response(parse_self, _resp(""))
+
+
+# ===========================================================================
+# Bug-hunt regressions: fuzzy arg-remapping must pick the most specific ref and
+# must not collapse two distinct provided args onto one ref (silent data loss).
+# ===========================================================================
+def test_fuzzy_arg_maps_name_to_method_name_not_project_name(parse_self):
+    # "name" is a substring of BOTH project_name and method_name; it must bind to
+    # method_name (the specific field the model means), not project_name (which is
+    # auto-injected and would silently drop the value).
+    content = json.dumps({"thoughts": "x", "command": {
+        "name": "extract_method_code", "args": {"file": "Foo.java", "name": "doStuff"}}})
+    _, _, reply = Agent.parse_and_process_response(parse_self, _resp(content))
+    a = reply["command"]["args"]
+    assert a.get("method_name") == "doStuff"
+    assert a.get("filepath") == "Foo.java"
+    assert a.get("project_name") == "Lang"  # auto-injected, not clobbered by "name"
+
+
+def test_fuzzy_arg_no_collapse_two_args_onto_one_ref(parse_self):
+    # "changed" and "lines" both fuzzy-match changed_lines; the ref must be filled
+    # by exactly one (first match wins), never silently last-writer-clobbered.
+    content = json.dumps({"thoughts": "x", "command": {
+        "name": "write_range", "args": {"filepath": "F.java", "changed": "AAA", "lines": "BBB"}}})
+    _, _, reply = Agent.parse_and_process_response(parse_self, _resp(content))
+    a = reply["command"]["args"]
+    assert a.get("changed_lines") == "AAA"
