@@ -1145,3 +1145,14 @@ def test_run_in_docker_forwards_export_form_key(monkeypatch, tmp_path):
     monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
     repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
     assert "OPENAI_API_KEY=sk-fromfile" in calls[-1]
+
+
+def test_setup_defects4j_env_prepends_bin_despite_superstring_path_entry(monkeypatch, tmp_path):
+    # A different PATH dir that merely has d4j_bin as a prefix must not suppress
+    # prepending the real bin (membership is per-entry, not substring).
+    import os
+    monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
+    d4j_bin = str(tmp_path / "defects4j" / "framework" / "bin")
+    monkeypatch.setenv("PATH", d4j_bin + "_other" + os.pathsep + "/usr/bin")
+    repairagent.setup_defects4j_env()
+    assert d4j_bin in repairagent.os.environ["PATH"].split(os.pathsep)

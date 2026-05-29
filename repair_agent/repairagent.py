@@ -719,14 +719,16 @@ def select_bugs() -> list[tuple[str, str]]:
 def setup_defects4j_env():
     """Set up Defects4J PATH and Perl environment."""
     d4j_bin = str(SCRIPT_DIR / "defects4j" / "framework" / "bin")
-    if d4j_bin not in os.environ.get("PATH", ""):
+    # Membership must be per-entry (split on os.pathsep), not substring: a
+    # different PATH dir that has d4j_bin as a prefix must not suppress this.
+    if d4j_bin not in os.environ.get("PATH", "").split(os.pathsep):
         os.environ["PATH"] = d4j_bin + os.pathsep + os.environ.get("PATH", "")
 
     # Add local cpanm/perl5 lib to PERL5LIB so Defects4J can find modules
     # installed via 'cpanm' as a non-root user (e.g. String::Interpolate).
     home_perl5 = str(Path.home() / "perl5" / "lib" / "perl5")
     current_perl5lib = os.environ.get("PERL5LIB", "")
-    if home_perl5 not in current_perl5lib:
+    if home_perl5 not in current_perl5lib.split(os.pathsep):
         os.environ["PERL5LIB"] = (
             home_perl5 + os.pathsep + current_perl5lib
             if current_perl5lib
