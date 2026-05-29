@@ -1,0 +1,75 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: unit tests + coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The project's import root and pytest/coverage config live under repair_agent/.
+        working-directory: repair_agent
+    strategy:
+      fail-fast: false
+      matrix:
+        # Verified locally on 3.12; add "3.10"/"3.11" once confirmed green.
+        python-version: ["3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: repair_agent/requirements-dev.txt
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Curated, mutually-compatible subset; the heavy/optional runtime stack
+          # (langchain, anthropic, …) is stubbed in tests/conftest.py.
+          pip install -r requirements-dev.txt
+
+      - name: Show environment
+        run: |
+          python --version
+          pip --version
+          coverage --version
+
+      - name: Run tests with coverage
+        run: |
+          coverage run -m pytest tests -q -p no:cacheprovider
+          # Gate on the curated, unit-tested module set defined in .coveragerc.
+          coverage report -m --fail-under=70
+          coverage xml
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo '### Coverage (unit-tested modules)';
+            echo '```';
+            coverage report -m || true;
+            echo '```';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: repair_agent/coverage.xml
+          if-no-files-found: ignore
