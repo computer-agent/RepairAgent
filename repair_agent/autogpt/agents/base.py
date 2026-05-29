@@ -397,6 +397,7 @@ please use the indicated format and produce a list, like this:
                 if not self.validate_command_parsing(command_dict):
                     continue
                 if command_dict["command"]["name"] == command_name:
+                    read_result = None  # reset per command so a trailing command doesn't inherit the previous result
                     lines_range = "{},{}".format(command_dict["command"]["args"]["startline"], command_dict["command"]["args"]["endline"])
                     file_path = command_dict["command"]["args"]["filepath"]
                     if i < len(messages_history) - 1:
@@ -433,6 +434,7 @@ please use the indicated format and produce a list, like this:
                 if not self.validate_command_parsing(command_dict):
                     continue
                 if command_dict["command"]["name"] == command_name:
+                    gen_result = None  # reset per command so a trailing command doesn't inherit the previous result
                     method_name = command_dict["command"]["args"]["method_name"]
                     if i < len(messages_history) - 1:
                         j = i + 1
@@ -537,6 +539,7 @@ please use the indicated format and produce a list, like this:
                 if not self.validate_command_parsing(command_dict):
                     continue
                 if command_dict["command"]["name"] == command_name:
+                    search_result = None  # reset per command so a trailing command doesn't inherit the previous result
                     key_words = command_dict["command"]["args"]["key_words"]
                     if i < len(messages_history) - 1:
                         j = i + 1
@@ -566,6 +569,7 @@ please use the indicated format and produce a list, like this:
                 if not self.validate_command_parsing(command_dict):
                     continue
                 if command_dict["command"]["name"] == command_name:
+                    search_result = None  # reset per command so a trailing command doesn't inherit the previous result
                     code_snippet = command_dict["command"]["args"]["code_snippet"]
                     file_path = command_dict["command"]["args"]["file_path"]
                     if i < len(messages_history) - 1:
@@ -597,6 +601,7 @@ please use the indicated format and produce a list, like this:
                 if not self.validate_command_parsing(command_dict):
                     continue
                 if command_dict["command"]["name"] == command_name:
+                    search_result = None  # reset per command so a trailing command doesn't inherit the previous result
                     method_name = command_dict["command"]["args"]["method_name"]
                     file_path = command_dict["command"]["args"]["filepath"]
                     if i < len(messages_history) - 1:
@@ -658,8 +663,13 @@ please use the indicated format and produce a list, like this:
         If so, update the prompt based on the changed state
         """
         
-        for i in range(len(self.history)-1, 0, -1):
+        for i in range(len(self.history)-1, -1, -1):
             if self.history[i].role == "assistant":
+                # The state-change trigger lives in the command's RESULT (next
+                # message). If the assistant message is last (no result yet),
+                # there is nothing to react to — avoid an IndexError.
+                if i + 1 >= len(self.history):
+                    break
                 if "Hypothesis discarded! You are now back at the state 'collect information to understand the bug'" in self.history[i+1].content:
                     if self.current_state != "collect information to understand the bug":
                         self.update_prompt_state("collect information to understand the bug")

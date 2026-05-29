@@ -789,3 +789,99 @@ def test_add_history_upto_token_limit_trims_when_over_limit():
     # nothing inserted; the cycle's messages are returned as trimmed
     assert len(prompt) == 1
     assert len(trimmed) == 3
+
+
+# ===========================================================================
+# Bug-hunt regressions: stale-result leakage in the history-pairing builders.
+# A trailing matching command with NO following result must NOT inherit the
+# PREVIOUS command's result (that would feed the LLM a corrupted association).
+# ===========================================================================
+def _permissive(fake):
+    fake.validate_command_parsing = lambda cd: True
+    return fake
+
+
+def test_construct_read_files_no_stale_result_on_trailing_command():
+    fake = _permissive(SimpleNamespace(read_files={}, history=[
+        Msg("assistant", assistant_cmd("read_range", {"startline": 1, "endline": 2, "filepath": "F.java"})),
+        Msg("user", "BODY-A"),
+        Msg("assistant", assistant_cmd("read_range", {"startline": 5, "endline": 6, "filepath": "G.java"})),
+    ]))
+    BaseAgent.construct_read_files(fake)
+    assert "F.java" in fake.read_files
+    assert "G.java" not in fake.read_files  # trailing cmd has no result -> not recorded
+
+
+def test_construct_generated_methods_no_stale_result():
+    fake = _permissive(SimpleNamespace(generated_methods=None, history=[
+        Msg("assistant", assistant_cmd("AI_generate_method_code", {"method_name": "m1"})),
+        Msg("user", "GEN-1"),
+        Msg("assistant", assistant_cmd("AI_generate_method_code", {"method_name": "m2"})),
+    ]))
+    BaseAgent.construct_generated_methods(fake)
+    assert fake.generated_methods == ("m1", "GEN-1")  # not ("m2", "GEN-1")
+
+
+def test_construct_search_queries_no_stale_result():
+    fake = _permissive(SimpleNamespace(search_queries=[], history=[
+        Msg("assistant", assistant_cmd("search_code_base", {"key_words": "a"})),
+        Msg("user", "RES-A"),
+        Msg("assistant", assistant_cmd("search_code_base", {"key_words": "b"})),
+    ]))
+    BaseAgent.construct_search_queries(fake)
+    assert fake.search_queries == [{"query": "a", "result": "RES-A"}]
+
+
+def test_construct_similar_calls_no_stale_result():
+    fake = _permissive(SimpleNamespace(similar_calls=None, history=[
+        Msg("assistant", assistant_cmd("extract_similar_functions_calls", {"code_snippet": "S1", "file_path": "F"})),
+        Msg("user", "RES-1"),
+        Msg("assistant", assistant_cmd("extract_similar_functions_calls", {"code_snippet": "S2", "file_path": "G"})),
+    ]))
+    BaseAgent.construct_similar_calls(fake)
+    assert len(fake.similar_calls) == 1
+    assert fake.similar_calls[0]["code_snippet"] == "S1"
+
+
+def test_construct_extracted_methods_no_stale_result():
+    fake = _permissive(SimpleNamespace(extracted_methods=[], history=[
+        Msg("assistant", assistant_cmd("extract_method_code", {"method_name": "m1", "filepath": "F"})),
+        Msg("user", "RES-1"),
+        Msg("assistant", assistant_cmd("extract_method_code", {"method_name": "m2", "filepath": "G"})),
+    ]))
+    BaseAgent.construct_extracted_methods(fake)
+    assert len(fake.extracted_methods) == 1
+    assert fake.extracted_methods[0]["method_name"] == "m1"
+
+
+# ===========================================================================
+# Bug-hunt regressions: switch_state must not crash, and must inspect index 0.
+# ===========================================================================
+def _switchable(history, state="collect information to understand the bug"):
+    fake = SimpleNamespace(history=history, current_state=state)
+    def upd(s):
+        fake.current_state = s
+    fake.update_prompt_state = upd
+    return fake
+
+
+def test_switch_state_no_indexerror_when_last_message_is_assistant():
+    # History ending with an assistant command (result not appended yet).
+    fake = _switchable([
+        Msg("user", "u1"),
+        Msg("user", "u2"),
+        Msg("assistant", assistant_cmd("read_range", {})),
+    ])
+    BaseAgent.switch_state(fake)  # must not raise IndexError
+    assert fake.current_state == "collect information to understand the bug"
+
+
+def test_switch_state_inspects_first_message():
+    # Assistant command at index 0, its result (with a transition trigger) at 1.
+    trigger = "\n **Note:** You are automatically switched to the state 'trying out candidate fixes'"
+    fake = _switchable([
+        Msg("assistant", assistant_cmd("write_fix", {})),
+        Msg("user", "fix applied." + trigger),
+    ])
+    BaseAgent.switch_state(fake)
+    assert fake.current_state == "trying out candidate fixes"
