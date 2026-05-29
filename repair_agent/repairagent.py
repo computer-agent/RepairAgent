@@ -202,6 +202,21 @@ def _check_python_packages() -> bool:
     return True
 
 
+def _parse_dotenv_line(raw: str):
+    """Parse one .env line into (key, value), mirroring python-dotenv: tolerate an
+    ``export `` prefix, spaces around ``=``, and surrounding quotes. Returns
+    (None, None) for blank/comment/invalid lines."""
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        return None, None
+    if line.startswith("export "):
+        line = line[len("export "):].strip()
+    if "=" not in line:
+        return None, None
+    key, value = line.split("=", 1)
+    return key.strip(), value.strip().strip('"').strip("'")
+
+
 def _has_api_key(key_name: str) -> bool:
     """Check if an API key is set in environment or .env files."""
     val = os.environ.get(key_name)
@@ -211,10 +226,9 @@ def _has_api_key(key_name: str) -> bool:
     for env_file in [SCRIPT_DIR / ".env", SCRIPT_DIR / "autogpt" / ".env"]:
         if env_file.exists():
             for line in env_file.read_text().splitlines():
-                if line.strip().startswith(f"{key_name}="):
-                    v = line.split("=", 1)[1].strip()
-                    if v and v != "GLOBAL-API-KEY-PLACEHOLDER":
-                        return True
+                k, v = _parse_dotenv_line(line)
+                if k == key_name and v and v != "GLOBAL-API-KEY-PLACEHOLDER":
+                    return True
     return False
 
 
@@ -860,14 +874,12 @@ def run_in_docker(bugs: list[tuple[str, str]], model: str, hyperparams: str, max
         for env_file in [SCRIPT_DIR / ".env", SCRIPT_DIR / "autogpt" / ".env"]:
             if env_file.exists():
                 for line in env_file.read_text().splitlines():
-                    line = line.strip()
-                    if "=" not in line or line.startswith("#"):
+                    k, v = _parse_dotenv_line(line)
+                    if not k or not v or v == "GLOBAL-API-KEY-PLACEHOLDER":
                         continue
-                    k, v = line.split("=", 1)
-                    k, v = k.strip(), v.strip()
-                    if k == "OPENAI_API_KEY" and not openai_key and v != "GLOBAL-API-KEY-PLACEHOLDER":
+                    if k == "OPENAI_API_KEY" and not openai_key:
                         openai_key = v
-                    elif k == "ANTHROPIC_API_KEY" and not anthropic_key and v != "GLOBAL-API-KEY-PLACEHOLDER":
+                    elif k == "ANTHROPIC_API_KEY" and not anthropic_key:
                         anthropic_key = v
 
     cmd = [

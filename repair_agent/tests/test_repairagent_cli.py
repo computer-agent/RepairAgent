@@ -1114,3 +1114,34 @@ class TestInstallDefects4j:
         monkeypatch.setattr(repairagent.subprocess, "run",
                             lambda cmd, *a, **k: _completed(0))
         assert repairagent.install_defects4j() is False
+
+
+# ===========================================================================
+# Bug-hunt regressions (Tier 2): dotenv parsing must match what the app loads.
+# ===========================================================================
+def test_has_api_key_detects_export_and_spaced_and_quoted_forms(monkeypatch, tmp_path):
+    monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for content in ('export OPENAI_API_KEY=sk-real\n',
+                    'OPENAI_API_KEY = sk-real\n',
+                    'OPENAI_API_KEY="sk-real"\n'):
+        (tmp_path / ".env").write_text(content)
+        assert repairagent._has_api_key("OPENAI_API_KEY") is True, content
+
+
+def test_run_in_docker_forwards_export_form_key(monkeypatch, tmp_path):
+    monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
+    monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    (tmp_path / ".env").write_text('export OPENAI_API_KEY=sk-fromfile\n')
+    calls = []
+
+    def fake_run(cmd, *a, **k):
+        calls.append(cmd)
+        if "images" in cmd:
+            return _completed(0, stdout="img")
+        return _completed(0)
+    monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
+    repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
+    assert "OPENAI_API_KEY=sk-fromfile" in calls[-1]
