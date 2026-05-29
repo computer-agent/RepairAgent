@@ -21,3 +21,4 @@ include =
     autogpt/json_utils/utilities.py
     autogpt/llm/utils/__init__.py
     create_files_index.py
+    repairagent.py
