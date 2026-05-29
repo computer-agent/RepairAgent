@@ -6,10 +6,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/codespaces/new?hide_repo_select=true&repo=sola-st/RepairAgent&ref=main"><img src="https://img.shields.io/badge/Open%20in-Codespaces-blue?logo=github" alt="Open in GitHub Codespaces"></a>
+  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/coverage-79%25-brightgreen.svg" alt="Coverage"></a>
+  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/tests-290%20passing-brightgreen.svg" alt="290 tests passing"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python 3.10+"></a>
   <a href="https://arxiv.org/abs/2403.17134"><img src="https://img.shields.io/badge/arXiv-2403.17134-b31b1b.svg" alt="arXiv"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python 3.10+"></a>
+  <a href="https://github.com/codespaces/new?hide_repo_select=true&repo=sola-st/RepairAgent&ref=main"><img src="https://img.shields.io/badge/Open%20in-Codespaces-blue?logo=github" alt="Open in GitHub Codespaces"></a>
 </p>
 
 ---
@@ -384,6 +387,24 @@ Note: RepairAgent encountered middleware exceptions on 29 bugs, which were not r
 ## Contributing
 
 If you find issues, bugs, or documentation gaps, please [open an issue](https://github.com/sola-st/RepairAgent/issues) or [email the author](mailto:fi_bouzenia@esi.dz).
+
+### Running the tests
+
+The unit-test suite is fast and needs no Java, Defects4J, or API key — the heavy
+runtime stack is stubbed (see `repair_agent/tests/conftest.py`). It runs on every
+push and pull request via [GitHub Actions](.github/workflows/tests.yml).
+
+```bash
+cd repair_agent
+python -m venv .venv-test && . .venv-test/bin/activate
+pip install -r requirements-dev.txt
+
+# Run the suite
+pytest tests -q
+
+# With coverage (gate: the curated module set in .coveragerc must stay >= 70%)
+coverage run -m pytest tests -q && coverage report -m --fail-under=70
+```
 
 ---
 
