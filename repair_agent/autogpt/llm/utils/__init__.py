@@ -219,20 +219,24 @@ def create_chat_completion(
         except openai.error.InvalidRequestError as e:
             err = str(e).lower()
             # Newer models (o1, o3, gpt-5-*, …) reject `max_tokens`, `temperature`
-            # and `response_format`. The exact error wording differs between
-            # public OpenAI and Azure OpenAI, so match on any of the tell-tale
-            # signals rather than one fixed phrase, then retry once with the
-            # reasoning-model kwargs. The `max_completion_tokens` guard ensures we
-            # only retry when we have NOT already converted the kwargs.
+            # and `response_format`. The exact wording differs between public
+            # OpenAI and Azure OpenAI, so match the characteristic parameter-
+            # rejection phrasings — but specifically enough to avoid retrying on
+            # unrelated errors that merely happen to contain a parameter word
+            # (e.g. content flagged as "unsupported"), which would mask the real error.
             param_incompatibility = (
-                "max_completion_tokens" in err
-                or ("max_tokens" in err and ("unsupported" in err or "not supported" in err))
-                or ("temperature" in err and ("unsupported" in err or "not support" in err))
-                or ("response_format" in err and ("unsupported" in err or "not support" in err))
+                "max_completion_tokens" in err          # "...use 'max_completion_tokens' instead"
+                or "unsupported parameter" in err        # OpenAI: "Unsupported parameter: 'max_tokens'..."
+                or "is not supported with this model" in err
+                or (
+                    "does not support" in err
+                    and any(
+                        f"'{p}'" in err or f" {p} " in err
+                        for p in ("temperature", "max_tokens", "response_format")
+                    )
+                )
             )
             if param_incompatibility and "max_completion_tokens" not in chat_completion_kwargs:
-                # Cache so subsequent calls skip the failed round-trip.
-                _REASONING_MODELS.add(model)
                 logger.warn(
                     f"Model {model} rejected standard parameters ({e}); retrying "
                     f"with max_completion_tokens and without temperature/response_format."
@@ -242,6 +246,9 @@ def create_chat_completion(
                     messages=prompt.raw(),
                     **chat_completion_kwargs,
                 )
+                # Cache ONLY after the retry succeeds, so a retry that fails for an
+                # unrelated reason doesn't permanently mislabel a normal model.
+                _REASONING_MODELS.add(model)
             else:
                 raise
 

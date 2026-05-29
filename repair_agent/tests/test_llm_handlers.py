@@ -318,3 +318,40 @@ def test_already_converted_kwargs_not_double_retried(monkeypatch):
 
     # gpt-5 converts on first call -> max_completion_tokens present -> no retry
     assert len(fake.calls) == 1
+
+
+# ===========================================================================
+# Bug-hunt regressions in the reasoning-model retry logic.
+# ===========================================================================
+def test_cache_not_poisoned_when_retry_fails(monkeypatch):
+    # A genuine param error triggers the retry, but the retry fails for an
+    # UNRELATED reason. The model must NOT be cached as a reasoning model
+    # (we never confirmed the param-rewrite was correct).
+    err1 = _invalid_request(
+        "Unsupported parameter: 'max_tokens' is not supported with this model. "
+        "Use 'max_completion_tokens' instead.")
+    err2 = _invalid_request("The server had an error while processing your request.")
+    fake = _RecordingCompletion(errors=[err1, err2])
+    monkeypatch.setattr(llm_utils.iopenai, "create_chat_completion", fake)
+
+    with pytest.raises(openai.error.InvalidRequestError):
+        llm_utils.create_chat_completion(
+            prompt=_make_prompt("gpt-4o"), config=_make_config(),
+            model="gpt-4o", max_tokens=500)
+    assert "gpt-4o" not in llm_utils._REASONING_MODELS
+
+
+def test_unrelated_error_mentioning_temperature_is_not_retried(monkeypatch):
+    # An error that merely contains the words "temperature" and "unsupported"
+    # but is NOT a parameter rejection must be re-raised, not retried (which
+    # would mask the real error).
+    err = _invalid_request(
+        "Your prompt about reactor temperature was flagged: unsupported content.")
+    fake = _RecordingCompletion(errors=[err, None])
+    monkeypatch.setattr(llm_utils.iopenai, "create_chat_completion", fake)
+
+    with pytest.raises(openai.error.InvalidRequestError):
+        llm_utils.create_chat_completion(
+            prompt=_make_prompt("gpt-4o"), config=_make_config(),
+            model="gpt-4o", max_tokens=500)
+    assert len(fake.calls) == 1  # no retry
