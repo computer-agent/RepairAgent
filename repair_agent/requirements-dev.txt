@@ -1,0 +1,32 @@
+# Test/dev dependencies — a curated, mutually-compatible subset that is enough to
+# import and unit-test the project's pure logic WITHOUT the heavy/optional runtime
+# stack (langchain, anthropic, chromadb, redis, docker, audio, …).
+#
+# Notes:
+# - pydantic is pinned <2 because the Auto-GPT-era config uses pydantic v1 APIs
+#   (`validator(..., each_item=True)`). Latest langchain wants pydantic v2, which
+#   conflicts — so tests stub `langchain` in tests/conftest.py instead of installing it.
+# - openai is pinned to the version the project targets (old 0.27.x SDK).
+#
+# Install with:  pip install -r requirements-dev.txt
+pytest==9.0.3
+coverage
+openai==0.27.8
+pydantic<2
+json-repair
+fuzzywuzzy
+javalang
+tiktoken
+regex
+rich
+numpy
+antlr4-python3-runtime
+jsonschema
+colorama
+pyyaml>=6.0.1
+python-dotenv
+beautifulsoup4
+distro
+tqdm
+abstract-singleton
+auto-gpt-plugin-template @ git+https://github.com/Significant-Gravitas/Auto-GPT-Plugin-Template@0.1.0

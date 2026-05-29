@@ -1,0 +1,23 @@
+# Coverage configuration for the unit-test suite.
+#
+# We measure coverage over the deterministic, unit-tested modules only. The bulk
+# of base.py/defects4j.py is live integration code (LLM loop, Defects4J/Java
+# subprocesses) that cannot run in CI, so measuring the whole tree would report a
+# misleadingly low number. The gate (see CI: `coverage report --fail-under`) is
+# applied to this curated set.
+[run]
+omit =
+    */.venv-test/*
+    tests/*
+
+[report]
+show_missing = True
+skip_covered = False
+include =
+    autogpt/agents/agent.py
+    autogpt/agents/base.py
+    autogpt/commands/defects4j.py
+    autogpt/config/config.py
+    autogpt/json_utils/utilities.py
+    autogpt/llm/utils/__init__.py
+    create_files_index.py

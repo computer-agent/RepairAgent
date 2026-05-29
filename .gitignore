@@ -194,3 +194,10 @@ repair_agent/hints.txt
 
 # Claude Code
 .claude/
+
+# Test virtualenv
+repair_agent/.venv-test/
+.venv-test/
+
+# Side-effect file written by MessageHistory.per_cycle during tests
+repair_agent/debug_prompt_summary_file.txt

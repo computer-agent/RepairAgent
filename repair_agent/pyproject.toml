@@ -57,6 +57,8 @@ skip = '''
 '''
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
 markers = [
     "requires_openai_api_key",
     "requires_huggingface_api_key"
