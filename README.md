@@ -7,8 +7,8 @@
 
 <p align="center">
   <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/coverage-79%25-brightgreen.svg" alt="Coverage"></a>
-  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/tests-290%20passing-brightgreen.svg" alt="290 tests passing"></a>
+  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/coverage-84%25-brightgreen.svg" alt="Coverage"></a>
+  <a href="https://github.com/sola-st/RepairAgent/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/tests-408%20passing-brightgreen.svg" alt="408 tests passing"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python 3.10+"></a>
   <a href="https://arxiv.org/abs/2403.17134"><img src="https://img.shields.io/badge/arXiv-2403.17134-b31b1b.svg" alt="arXiv"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
