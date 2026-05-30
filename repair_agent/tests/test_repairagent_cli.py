@@ -1288,3 +1288,48 @@ def test_setup_defects4j_env_prepends_bin_despite_superstring_path_entry(
     monkeypatch.setenv("PATH", d4j_bin + "_other" + os.pathsep + "/usr/bin")
     repairagent.setup_defects4j_env()
     assert d4j_bin in repairagent.os.environ["PATH"].split(os.pathsep)
+
+
+# ===========================================================================
+# doctor: read-only environment preflight
+# ===========================================================================
+class TestDoctor:
+    def test_all_ok_exits_zero(self, monkeypatch):
+        monkeypatch.setattr(
+            repairagent,
+            "check_environment",
+            lambda: {"Python 3.10+": (True, "3.12"), "API key": (True, "OpenAI")},
+        )
+        res = CliRunner().invoke(repairagent.cli, ["doctor"])
+        assert res.exit_code == 0
+        assert "ready" in res.output.lower()
+
+    def test_missing_exits_nonzero(self, monkeypatch):
+        monkeypatch.setattr(
+            repairagent,
+            "check_environment",
+            lambda: {"Java (JDK)": (False, "not found"), "API key": (True, "OpenAI")},
+        )
+        res = CliRunner().invoke(repairagent.cli, ["doctor"])
+        assert res.exit_code == 1
+        assert "Missing" in res.output and "Java (JDK)" in res.output
+
+    def test_does_not_install_or_prompt(self, monkeypatch):
+        # doctor must be read-only: never call install_all_dependencies / setup_api_keys
+        monkeypatch.setattr(
+            repairagent,
+            "check_environment",
+            lambda: {"Defects4J": (False, "not found"), "API key": (False, "none")},
+        )
+        monkeypatch.setattr(
+            repairagent,
+            "install_all_dependencies",
+            lambda: (_ for _ in ()).throw(AssertionError("doctor must not install")),
+        )
+        monkeypatch.setattr(
+            repairagent,
+            "setup_api_keys",
+            lambda: (_ for _ in ()).throw(AssertionError("doctor must not configure")),
+        )
+        res = CliRunner().invoke(repairagent.cli, ["doctor"])
+        assert res.exit_code == 1

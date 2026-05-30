@@ -1139,5 +1139,26 @@ def setup(docker, install_deps):
         console.print("    python3 repairagent.py run --bugs 'Chart 1' --model gpt-4o-mini")
 
 
+@cli.command()
+def doctor():
+    """Diagnose the environment and report what is missing (read-only).
+
+    Unlike `setup`, this never installs anything or prompts: it just runs the
+    environment checks and exits non-zero if something required is missing, so
+    it is safe to use in scripts and CI as a preflight.
+    """
+    checks = check_environment()
+    display_environment(checks)
+    missing = [name for name, (ok, _) in checks.items() if not ok]
+    if missing:
+        console.print(f"  [yellow]Missing: {', '.join(missing)}[/yellow]")
+        console.print(
+            "  Run [bold]python3 repairagent.py setup[/bold] to install/configure, "
+            "or see the README."
+        )
+        raise SystemExit(1)
+    console.print("  [green]All checks passed. Environment is ready.[/green]")
+
+
 if __name__ == "__main__":
     cli()
