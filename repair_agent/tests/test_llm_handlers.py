@@ -117,9 +117,7 @@ class _RecordingCompletion:
         if idx < len(self.errors) and self.errors[idx] is not None:
             raise self.errors[idx]
         return SimpleNamespace(
-            choices=[
-                SimpleNamespace(message={"content": "ok", "function_call": None})
-            ]
+            choices=[SimpleNamespace(message={"content": "ok", "function_call": None})]
         )
 
 
@@ -191,9 +189,7 @@ def test_openai_style_unsupported_max_tokens_triggers_one_retry(monkeypatch):
 
 
 def test_azure_style_temperature_not_supported_triggers_retry(monkeypatch):
-    err = _invalid_request(
-        "temperature is not supported with this model."
-    )
+    err = _invalid_request("temperature is not supported with this model.")
     fake = _RecordingCompletion(errors=[err, None])
     monkeypatch.setattr(llm_utils.iopenai, "create_chat_completion", fake)
 
@@ -329,15 +325,19 @@ def test_cache_not_poisoned_when_retry_fails(monkeypatch):
     # (we never confirmed the param-rewrite was correct).
     err1 = _invalid_request(
         "Unsupported parameter: 'max_tokens' is not supported with this model. "
-        "Use 'max_completion_tokens' instead.")
+        "Use 'max_completion_tokens' instead."
+    )
     err2 = _invalid_request("The server had an error while processing your request.")
     fake = _RecordingCompletion(errors=[err1, err2])
     monkeypatch.setattr(llm_utils.iopenai, "create_chat_completion", fake)
 
     with pytest.raises(openai.error.InvalidRequestError):
         llm_utils.create_chat_completion(
-            prompt=_make_prompt("gpt-4o"), config=_make_config(),
-            model="gpt-4o", max_tokens=500)
+            prompt=_make_prompt("gpt-4o"),
+            config=_make_config(),
+            model="gpt-4o",
+            max_tokens=500,
+        )
     assert "gpt-4o" not in llm_utils._REASONING_MODELS
 
 
@@ -346,12 +346,16 @@ def test_unrelated_error_mentioning_temperature_is_not_retried(monkeypatch):
     # but is NOT a parameter rejection must be re-raised, not retried (which
     # would mask the real error).
     err = _invalid_request(
-        "Your prompt about reactor temperature was flagged: unsupported content.")
+        "Your prompt about reactor temperature was flagged: unsupported content."
+    )
     fake = _RecordingCompletion(errors=[err, None])
     monkeypatch.setattr(llm_utils.iopenai, "create_chat_completion", fake)
 
     with pytest.raises(openai.error.InvalidRequestError):
         llm_utils.create_chat_completion(
-            prompt=_make_prompt("gpt-4o"), config=_make_config(),
-            model="gpt-4o", max_tokens=500)
+            prompt=_make_prompt("gpt-4o"),
+            config=_make_config(),
+            model="gpt-4o",
+            max_tokens=500,
+        )
     assert len(fake.calls) == 1  # no retry

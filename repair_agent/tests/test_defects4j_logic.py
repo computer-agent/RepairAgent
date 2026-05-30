@@ -20,15 +20,14 @@ import os
 
 import pytest
 
-import tests.conftest  # noqa: F401  (ensures sys.path / chdir / stubs are in place)
-
 import create_files_index
+import tests.conftest  # noqa: F401  (ensures sys.path / chdir / stubs are in place)
 from autogpt.commands import defects4j
-
 
 # --------------------------------------------------------------------------
 # extract_file_name : parse a single 'diff --git' line
 # --------------------------------------------------------------------------
+
 
 def test_extract_file_name_strips_leading_segment():
     line = "diff --git a/src/main/java/Foo.java b/src/main/java/Foo.java"
@@ -45,6 +44,7 @@ def test_extract_file_name_single_segment():
 # --------------------------------------------------------------------------
 # get_edited_files : collect file names from a .src.patch
 # --------------------------------------------------------------------------
+
 
 def _make_patch(base_dir, name, index, content):
     patch_dir = os.path.join(
@@ -83,6 +83,7 @@ def test_get_edited_files_empty_patch(tmp_path, monkeypatch):
 # parse_buggy_lines : "path#lineno#code" -> {path: [(lineno, code), ...]}
 # --------------------------------------------------------------------------
 
+
 def test_parse_buggy_lines_groups_by_file():
     lines = [
         "src/Foo.java#10#  int x;",
@@ -119,6 +120,7 @@ def test_parse_buggy_lines_malformed_line_skipped():
 # --------------------------------------------------------------------------
 # create_fix_template : reads a .buggy.lines file and builds a template string
 # --------------------------------------------------------------------------
+
 
 def _make_buggy_lines(base_dir, name, index, content):
     d = os.path.join(base_dir, "defects4j", "buggy-lines")
@@ -159,6 +161,7 @@ def test_create_fix_template_missing_file_raises(tmp_path, monkeypatch):
 # extract_targeted_lines : flatten edit dicts into a list of ints
 # --------------------------------------------------------------------------
 
+
 def test_extract_targeted_lines_all_edit_types():
     changes = [
         {
@@ -187,6 +190,7 @@ def test_extract_targeted_lines_empty():
 # remove_comments : strip // and /* */ comments from Java source
 # --------------------------------------------------------------------------
 
+
 def test_remove_comments_strips_both_styles():
     code = "int x; // trailing\n/* block\ncomment */int y;"
     out = defects4j.remove_comments(code)
@@ -205,6 +209,7 @@ def test_remove_comments_no_comments_unchanged():
 # extract_failing_test : parse the "Failing tests:" block
 # --------------------------------------------------------------------------
 
+
 def test_extract_failing_test_match():
     msg = "header\nFailing tests: 2\n  - org.foo.BarTest::testBaz\nfooter"
     assert defects4j.extract_failing_test(msg) == {
@@ -221,6 +226,7 @@ def test_extract_failing_test_no_match_returns_none():
 # --------------------------------------------------------------------------
 # extract_root_cause : slice text between "Root cause" and the separator
 # --------------------------------------------------------------------------
+
 
 def test_extract_root_cause_extracts_segment():
     sep = "-" * 80
@@ -242,6 +248,7 @@ def test_extract_root_cause_keyword_absent_returns_empty():
 # --------------------------------------------------------------------------
 # list_java_files : recursively collect .java files
 # --------------------------------------------------------------------------
+
 
 def test_list_java_files_only_java_and_recurses(tmp_path):
     (tmp_path / "A.java").write_text("class A {}")

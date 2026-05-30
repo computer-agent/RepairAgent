@@ -5,6 +5,7 @@ All subprocess / prompt / filesystem-touching behavior is mocked. Nothing real
 executed or written; we monkeypatch ``repairagent.subprocess.run``,
 ``repairagent.SCRIPT_DIR`` and the rich prompt classes as needed.
 """
+
 import subprocess
 import types
 
@@ -13,35 +14,40 @@ from click.testing import CliRunner
 
 import repairagent
 
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _completed(returncode=0, stdout="", stderr=""):
     """Build a fake subprocess.CompletedProcess."""
-    return subprocess.CompletedProcess(args=[], returncode=returncode,
-                                       stdout=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(
+        args=[], returncode=returncode, stdout=stdout, stderr=stderr
+    )
 
 
 # ===========================================================================
 # 1. PURE PARSERS
 # ===========================================================================
 
+
 class TestParseBugsString:
     def test_basic(self):
         assert repairagent.parse_bugs_string("Chart 1,Math 5") == [
-            ("Chart", "1"), ("Math", "5")
+            ("Chart", "1"),
+            ("Math", "5"),
         ]
 
     def test_with_spaces_around_commas(self):
         assert repairagent.parse_bugs_string("Chart 1, Math 5") == [
-            ("Chart", "1"), ("Math", "5")
+            ("Chart", "1"),
+            ("Math", "5"),
         ]
 
     def test_surrounding_quotes_stripped(self):
         assert repairagent.parse_bugs_string('"Chart 1,Math 5"') == [
-            ("Chart", "1"), ("Math", "5")
+            ("Chart", "1"),
+            ("Math", "5"),
         ]
         assert repairagent.parse_bugs_string("'Lang 3'") == [("Lang", "3")]
 
@@ -58,7 +64,8 @@ class TestParseBugsString:
 
     def test_per_entry_quotes_stripped(self):
         assert repairagent.parse_bugs_string('"Chart 1","Math 5"') == [
-            ("Chart", "1"), ("Math", "5")
+            ("Chart", "1"),
+            ("Math", "5"),
         ]
 
 
@@ -67,13 +74,15 @@ class TestLoadBugsFile:
         f = tmp_path / "bugs.txt"
         f.write_text(
             "Chart 1\n"
-            "\n"               # blank line skipped
-            "Math 5 extra\n"   # extra tokens -> first two kept
-            "   \n"            # whitespace-only skipped
+            "\n"  # blank line skipped
+            "Math 5 extra\n"  # extra tokens -> first two kept
+            "   \n"  # whitespace-only skipped
             "Lang 7\n"
         )
         assert repairagent.load_bugs_file(str(f)) == [
-            ("Chart", "1"), ("Math", "5"), ("Lang", "7")
+            ("Chart", "1"),
+            ("Math", "5"),
+            ("Lang", "7"),
         ]
 
     def test_single_token_line_skipped(self, tmp_path):
@@ -91,10 +100,10 @@ class TestLoadBugsFile:
 # 2. ENV / INSPECTION HELPERS
 # ===========================================================================
 
+
 class TestIsInContainer:
     def test_dockerenv(self, monkeypatch):
-        monkeypatch.setattr(repairagent.os.path, "exists",
-                            lambda p: p == "/.dockerenv")
+        monkeypatch.setattr(repairagent.os.path, "exists", lambda p: p == "/.dockerenv")
         monkeypatch.delenv("CODESPACES", raising=False)
         assert repairagent.is_in_container() is True
 
@@ -104,8 +113,9 @@ class TestIsInContainer:
         assert repairagent.is_in_container() is True
 
     def test_run_containerenv(self, monkeypatch):
-        monkeypatch.setattr(repairagent.os.path, "exists",
-                            lambda p: p == "/run/.containerenv")
+        monkeypatch.setattr(
+            repairagent.os.path, "exists", lambda p: p == "/run/.containerenv"
+        )
         monkeypatch.delenv("CODESPACES", raising=False)
         assert repairagent.is_in_container() is True
 
@@ -141,26 +151,30 @@ class TestHasApiKey:
 
     def test_env_file_placeholder_ignored(self, monkeypatch, tmp_path):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        (tmp_path / ".env").write_text(
-            "OPENAI_API_KEY=GLOBAL-API-KEY-PLACEHOLDER\n"
-        )
+        (tmp_path / ".env").write_text("OPENAI_API_KEY=GLOBAL-API-KEY-PLACEHOLDER\n")
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         assert repairagent._has_api_key("OPENAI_API_KEY") is False
 
 
 class TestCheckPythonPackages:
     def test_all_present(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "__import__",
-                            lambda name, *a, **k: types.ModuleType(name),
-                            raising=False)
+        monkeypatch.setattr(
+            repairagent,
+            "__import__",
+            lambda name, *a, **k: types.ModuleType(name),
+            raising=False,
+        )
         # repairagent uses the builtin __import__ inside the function; patch builtins
         import builtins
-        monkeypatch.setattr(builtins, "__import__",
-                            lambda name, *a, **k: types.ModuleType(name))
+
+        monkeypatch.setattr(
+            builtins, "__import__", lambda name, *a, **k: types.ModuleType(name)
+        )
         assert repairagent._check_python_packages() is True
 
     def test_one_missing(self, monkeypatch):
         import builtins
+
         real_import = builtins.__import__
 
         def fake_import(name, *a, **k):
@@ -175,8 +189,10 @@ class TestCheckPythonPackages:
 class TestCheckBootstrapDeps:
     def test_all_present(self, monkeypatch):
         import builtins
-        monkeypatch.setattr(builtins, "__import__",
-                            lambda name, *a, **k: types.ModuleType(name))
+
+        monkeypatch.setattr(
+            builtins, "__import__", lambda name, *a, **k: types.ModuleType(name)
+        )
         assert repairagent._check_bootstrap_deps() == []
 
     def test_missing(self, monkeypatch):
@@ -193,24 +209,30 @@ class TestCheckBootstrapDeps:
 
 class TestCheckCommand:
     def test_success_returns_stdout(self, monkeypatch):
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(0, "  output here  "))
+        monkeypatch.setattr(
+            repairagent.subprocess,
+            "run",
+            lambda *a, **k: _completed(0, "  output here  "),
+        )
         assert repairagent._check_command(["foo"]) == "output here"
 
     def test_nonzero_returns_none(self, monkeypatch):
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(1, "stuff"))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(1, "stuff")
+        )
         assert repairagent._check_command(["foo"]) is None
 
     def test_file_not_found(self, monkeypatch):
         def boom(*a, **k):
             raise FileNotFoundError()
+
         monkeypatch.setattr(repairagent.subprocess, "run", boom)
         assert repairagent._check_command(["nope"]) is None
 
     def test_timeout(self, monkeypatch):
         def boom(*a, **k):
             raise subprocess.TimeoutExpired(cmd="x", timeout=10)
+
         monkeypatch.setattr(repairagent.subprocess, "run", boom)
         assert repairagent._check_command(["slow"]) is None
 
@@ -222,6 +244,7 @@ class TestCheckEnvironment:
             if cmd and cmd[0] == "java":
                 return _completed(0, stderr='openjdk version "11.0"')
             return _completed(0, stdout="ok")
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: True)
         monkeypatch.setattr(repairagent, "_has_api_key", lambda k: True)
@@ -231,8 +254,14 @@ class TestCheckEnvironment:
         checks = repairagent.check_environment()
 
         assert set(checks) >= {
-            "Python 3.10+", "Java (JDK)", "Perl", "cpanminus",
-            "Subversion", "Defects4J", "Python packages", "API key",
+            "Python 3.10+",
+            "Java (JDK)",
+            "Perl",
+            "cpanminus",
+            "Subversion",
+            "Defects4J",
+            "Python packages",
+            "API key",
         }
         # each value is a (bool, str) tuple
         for ok, detail in checks.values():
@@ -247,6 +276,7 @@ class TestCheckEnvironment:
     def test_all_missing(self, monkeypatch):
         def fake_run(cmd, *a, **k):
             raise FileNotFoundError()
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: False)
         monkeypatch.setattr(repairagent, "_has_api_key", lambda k: False)
@@ -259,11 +289,13 @@ class TestCheckEnvironment:
         assert checks["API key"] == (False, "not configured")
 
     def test_api_key_openai_only(self, monkeypatch):
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(1))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(1)
+        )
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: True)
-        monkeypatch.setattr(repairagent, "_has_api_key",
-                            lambda k: k == "OPENAI_API_KEY")
+        monkeypatch.setattr(
+            repairagent, "_has_api_key", lambda k: k == "OPENAI_API_KEY"
+        )
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: None)
         checks = repairagent.check_environment()
         assert checks["API key"] == (True, "OpenAI")
@@ -275,12 +307,14 @@ class TestDetectMissingSystemPackages:
             if cmd and cmd[0] == "java":
                 return _completed(0, stderr="openjdk 11")
             return _completed(0, stdout="ok")
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         assert repairagent.detect_missing_system_packages() == []
 
     def test_all_missing(self, monkeypatch):
         def fake_run(cmd, *a, **k):
             raise FileNotFoundError()
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         missing = repairagent.detect_missing_system_packages()
         names = [pkg for pkg, _ in missing]
@@ -295,6 +329,7 @@ class TestDetectMissingSystemPackages:
             if cmd and cmd[0] == "java":
                 return _completed(1, stderr='openjdk version "11"')
             raise FileNotFoundError()
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         missing = dict(repairagent.detect_missing_system_packages())
         assert "openjdk-11-jdk" not in missing
@@ -304,6 +339,7 @@ class TestDetectMissingSystemPackages:
 # ===========================================================================
 # 3. SETUP HELPERS (SCRIPT_DIR -> tmp_path)
 # ===========================================================================
+
 
 def _make_d4j_tree(root, projects):
     """Create a realistic defects4j/framework/projects/<P>/patches/<n>.src.patch tree.
@@ -362,10 +398,16 @@ class TestIncrementExperiment:
         path = repairagent.increment_experiment()
         assert path.endswith("experiment_1")
         exp_dir = tmp_path / "experimental_setups" / "experiment_1"
-        for sub in ["logs", "responses", "external_fixes", "saved_contexts",
-                    "mutations_history", "plausible_patches"]:
+        for sub in [
+            "logs",
+            "responses",
+            "external_fixes",
+            "saved_contexts",
+            "mutations_history",
+            "plausible_patches",
+        ]:
             assert (exp_dir / sub).is_dir()
-        list_txt = (tmp_path / "experimental_setups" / "experiments_list.txt")
+        list_txt = tmp_path / "experimental_setups" / "experiments_list.txt"
         assert list_txt.read_text().strip() == "experiment_1"
 
     def test_increment_existing(self, monkeypatch, tmp_path):
@@ -402,20 +444,34 @@ class TestSetupDefects4jEnv:
 # 4. CLI (CliRunner)
 # ===========================================================================
 
+
 class TestRunCommand:
     def test_bugs_option_parsed(self, monkeypatch):
         rec = {}
 
         def recorder(bugs, model, hyperparams, max_cycles, temperature=0.0):
-            rec.update(bugs=bugs, model=model, hyperparams=hyperparams,
-                       max_cycles=max_cycles, temperature=temperature)
+            rec.update(
+                bugs=bugs,
+                model=model,
+                hyperparams=hyperparams,
+                max_cycles=max_cycles,
+                temperature=temperature,
+            )
 
         monkeypatch.setattr(repairagent, "execute_run", recorder)
         runner = CliRunner()
-        result = runner.invoke(repairagent.cli, [
-            "run", "--bugs", "Chart 1,Math 5",
-            "--model", "gpt-4o-mini", "--max-cycles", "5",
-        ])
+        result = runner.invoke(
+            repairagent.cli,
+            [
+                "run",
+                "--bugs",
+                "Chart 1,Math 5",
+                "--model",
+                "gpt-4o-mini",
+                "--max-cycles",
+                "5",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert rec["bugs"] == [("Chart", "1"), ("Math", "5")]
         assert rec["model"] == "gpt-4o-mini"
@@ -423,15 +479,25 @@ class TestRunCommand:
 
     def test_docker_flag_routes(self, monkeypatch):
         rec = {}
-        monkeypatch.setattr(repairagent, "run_in_docker",
-                            lambda *a, **k: rec.update(called=True, args=a))
+        monkeypatch.setattr(
+            repairagent,
+            "run_in_docker",
+            lambda *a, **k: rec.update(called=True, args=a),
+        )
         # ensure execute_run is NOT called
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda *a, **k: rec.update(execute_called=True))
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda *a, **k: rec.update(execute_called=True)
+        )
         runner = CliRunner()
-        result = runner.invoke(repairagent.cli, [
-            "run", "--bugs", "Chart 1", "--docker",
-        ])
+        result = runner.invoke(
+            repairagent.cli,
+            [
+                "run",
+                "--bugs",
+                "Chart 1",
+                "--docker",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert rec.get("called") is True
         assert "execute_called" not in rec
@@ -439,8 +505,9 @@ class TestRunCommand:
 
     def test_bugs_file_path(self, monkeypatch, tmp_path):
         rec = {}
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda bugs, *a, **k: rec.update(bugs=bugs))
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda bugs, *a, **k: rec.update(bugs=bugs)
+        )
         f = tmp_path / "bugs.txt"
         f.write_text("Lang 2\nTime 3\n")
         runner = CliRunner()
@@ -450,10 +517,10 @@ class TestRunCommand:
 
     def test_no_bugs_falls_back_to_select_bugs(self, monkeypatch):
         rec = {}
-        monkeypatch.setattr(repairagent, "select_bugs",
-                            lambda: [("Mockito", "9")])
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda bugs, *a, **k: rec.update(bugs=bugs))
+        monkeypatch.setattr(repairagent, "select_bugs", lambda: [("Mockito", "9")])
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda bugs, *a, **k: rec.update(bugs=bugs)
+        )
         runner = CliRunner()
         result = runner.invoke(repairagent.cli, ["run"])
         assert result.exit_code == 0, result.output
@@ -461,17 +528,20 @@ class TestRunCommand:
 
     def test_empty_bugs_exits_1(self, monkeypatch):
         # --bugs with only invalid entries -> empty list -> sys.exit(1)
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda *a, **k: pytest.fail("should not run"))
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda *a, **k: pytest.fail("should not run")
+        )
         runner = CliRunner()
         result = runner.invoke(repairagent.cli, ["run", "--bugs", "garbage"])
         assert result.exit_code == 1
 
     def test_hyperparams_default(self, monkeypatch):
         rec = {}
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda bugs, model, hyperparams, *a, **k:
-                            rec.update(hp=hyperparams))
+        monkeypatch.setattr(
+            repairagent,
+            "execute_run",
+            lambda bugs, model, hyperparams, *a, **k: rec.update(hp=hyperparams),
+        )
         runner = CliRunner()
         result = runner.invoke(repairagent.cli, ["run", "--bugs", "Chart 1"])
         assert result.exit_code == 0, result.output
@@ -494,15 +564,23 @@ class TestSetupCommand:
 
     def test_missing_deps_install(self, monkeypatch):
         # first call: something missing; after install: all ok
-        states = iter([
-            {"Python packages": (False, "some missing"), "API key": (True, "OpenAI")},
-            {"Python packages": (True, "installed"), "API key": (True, "OpenAI")},
-            {"Python packages": (True, "installed"), "API key": (True, "OpenAI")},
-        ])
+        states = iter(
+            [
+                {
+                    "Python packages": (False, "some missing"),
+                    "API key": (True, "OpenAI"),
+                },
+                {"Python packages": (True, "installed"), "API key": (True, "OpenAI")},
+                {"Python packages": (True, "installed"), "API key": (True, "OpenAI")},
+            ]
+        )
         monkeypatch.setattr(repairagent, "check_environment", lambda: next(states))
         rec = {}
-        monkeypatch.setattr(repairagent, "install_all_dependencies",
-                            lambda: rec.update(installed=True) or True)
+        monkeypatch.setattr(
+            repairagent,
+            "install_all_dependencies",
+            lambda: rec.update(installed=True) or True,
+        )
         # Confirm.ask: install? yes; reconfigure? no
         answers = iter([True, False])
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: next(answers))
@@ -513,24 +591,29 @@ class TestSetupCommand:
 
     def test_docker_builds_image(self, monkeypatch):
         rec = {}
-        monkeypatch.setattr(repairagent, "check_environment",
-                            lambda: {"API key": (True, "OpenAI")})
-        monkeypatch.setattr(repairagent, "build_docker_image",
-                            lambda: rec.update(built=True))
+        monkeypatch.setattr(
+            repairagent, "check_environment", lambda: {"API key": (True, "OpenAI")}
+        )
+        monkeypatch.setattr(
+            repairagent, "build_docker_image", lambda: rec.update(built=True)
+        )
         runner = CliRunner()
         result = runner.invoke(repairagent.cli, ["setup", "--docker"])
         assert result.exit_code == 0, result.output
         assert rec.get("built") is True
 
     def test_no_api_key_configures(self, monkeypatch):
-        states = iter([
-            {"API key": (False, "not configured")},
-            {"API key": (True, "OpenAI")},
-        ])
+        states = iter(
+            [
+                {"API key": (False, "not configured")},
+                {"API key": (True, "OpenAI")},
+            ]
+        )
         monkeypatch.setattr(repairagent, "check_environment", lambda: next(states))
         rec = {}
-        monkeypatch.setattr(repairagent, "setup_api_keys",
-                            lambda: rec.update(configured=True))
+        monkeypatch.setattr(
+            repairagent, "setup_api_keys", lambda: rec.update(configured=True)
+        )
         # Confirm.ask: configure API keys now? -> yes
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
         runner = CliRunner()
@@ -542,8 +625,9 @@ class TestSetupCommand:
 class TestBareCli:
     def test_invokes_interactive_run(self, monkeypatch):
         rec = {}
-        monkeypatch.setattr(repairagent, "interactive_run",
-                            lambda: rec.update(called=True))
+        monkeypatch.setattr(
+            repairagent, "interactive_run", lambda: rec.update(called=True)
+        )
         runner = CliRunner()
         result = runner.invoke(repairagent.cli, [])
         assert result.exit_code == 0, result.output
@@ -554,24 +638,28 @@ class TestBareCli:
 # Focused interactive_run happy path
 # ===========================================================================
 
+
 class TestInteractiveRun:
     def test_happy_path_local(self, monkeypatch):
         rec = {}
         # environment all OK including API key
-        monkeypatch.setattr(repairagent, "check_environment",
-                            lambda: {"API key": (True, "OpenAI")})
+        monkeypatch.setattr(
+            repairagent, "check_environment", lambda: {"API key": (True, "OpenAI")}
+        )
         # no docker -> behave as not-in-container but docker missing
         monkeypatch.setattr(repairagent, "is_in_container", lambda: False)
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: None)
-        monkeypatch.setattr(repairagent, "select_model",
-                            lambda: ("gpt-4o-mini", 0.0))
-        monkeypatch.setattr(repairagent, "select_bugs",
-                            lambda: [("Chart", "1")])
+        monkeypatch.setattr(repairagent, "select_model", lambda: ("gpt-4o-mini", 0.0))
+        monkeypatch.setattr(repairagent, "select_bugs", lambda: [("Chart", "1")])
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 40)
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda bugs, model, hyperparams, max_cycles, temperature=0.0:
-                            rec.update(bugs=bugs, model=model, max_cycles=max_cycles))
+        monkeypatch.setattr(
+            repairagent,
+            "execute_run",
+            lambda bugs, model, hyperparams, max_cycles, temperature=0.0: rec.update(
+                bugs=bugs, model=model, max_cycles=max_cycles
+            ),
+        )
 
         repairagent.interactive_run()
 
@@ -580,52 +668,56 @@ class TestInteractiveRun:
         assert rec["max_cycles"] == 40
 
     def test_abort_on_no_confirm(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "check_environment",
-                            lambda: {"API key": (True, "OpenAI")})
+        monkeypatch.setattr(
+            repairagent, "check_environment", lambda: {"API key": (True, "OpenAI")}
+        )
         monkeypatch.setattr(repairagent, "is_in_container", lambda: True)
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: None)
-        monkeypatch.setattr(repairagent, "select_model",
-                            lambda: ("gpt-4o-mini", 0.0))
-        monkeypatch.setattr(repairagent, "select_bugs",
-                            lambda: [("Chart", "1")])
+        monkeypatch.setattr(repairagent, "select_model", lambda: ("gpt-4o-mini", 0.0))
+        monkeypatch.setattr(repairagent, "select_bugs", lambda: [("Chart", "1")])
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 40)
         # Confirm "Start?" -> no
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: False)
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda *a, **k: pytest.fail("should not run"))
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda *a, **k: pytest.fail("should not run")
+        )
         # should return cleanly without running
         repairagent.interactive_run()
 
     def test_installs_missing_then_docker(self, monkeypatch):
         rec = {}
         # first check: missing python packages; after install: ok
-        states = iter([
-            {"Python packages": (False, "missing"), "API key": (False, "no")},
-            {"Python packages": (True, "ok"), "API key": (True, "OpenAI")},
-        ])
+        states = iter(
+            [
+                {"Python packages": (False, "missing"), "API key": (False, "no")},
+                {"Python packages": (True, "ok"), "API key": (True, "OpenAI")},
+            ]
+        )
         monkeypatch.setattr(repairagent, "check_environment", lambda: next(states))
-        monkeypatch.setattr(repairagent, "install_all_dependencies",
-                            lambda: rec.update(installed=True))
+        monkeypatch.setattr(
+            repairagent, "install_all_dependencies", lambda: rec.update(installed=True)
+        )
         # API key still false on the FIRST checks snapshot used post-install?
         # interactive_run re-reads checks; second snapshot has API key True so no setup.
-        monkeypatch.setattr(repairagent, "setup_api_keys",
-                            lambda: rec.update(api=True))
+        monkeypatch.setattr(repairagent, "setup_api_keys", lambda: rec.update(api=True))
         # in-container False + docker present -> mode prompt; pick "2" (docker)
         monkeypatch.setattr(repairagent, "is_in_container", lambda: False)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/docker")
-        monkeypatch.setattr(repairagent, "select_model",
-                            lambda: ("claude-x", 0.5))
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
+        monkeypatch.setattr(repairagent, "select_model", lambda: ("claude-x", 0.5))
         monkeypatch.setattr(repairagent, "select_bugs", lambda: [("Lang", "3")])
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 10)
         # Prompt.ask used for the mode choice -> "2"
         monkeypatch.setattr(repairagent.Prompt, "ask", lambda *a, **k: "2")
         # Confirm: install missing? yes ; Start? yes
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
-        monkeypatch.setattr(repairagent, "run_in_docker",
-                            lambda *a, **k: rec.update(docker=True, args=a))
-        monkeypatch.setattr(repairagent, "execute_run",
-                            lambda *a, **k: pytest.fail("should use docker"))
+        monkeypatch.setattr(
+            repairagent,
+            "run_in_docker",
+            lambda *a, **k: rec.update(docker=True, args=a),
+        )
+        monkeypatch.setattr(
+            repairagent, "execute_run", lambda *a, **k: pytest.fail("should use docker")
+        )
 
         repairagent.interactive_run()
 
@@ -638,10 +730,12 @@ class TestInteractiveRun:
 # select_model
 # ===========================================================================
 
+
 class TestSelectModel:
     def test_openai_pick(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "_has_api_key",
-                            lambda k: k == "OPENAI_API_KEY")
+        monkeypatch.setattr(
+            repairagent, "_has_api_key", lambda k: k == "OPENAI_API_KEY"
+        )
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 2)
         monkeypatch.setattr(repairagent.Prompt, "ask", lambda *a, **k: "0.3")
         model, temp = repairagent.select_model()
@@ -660,8 +754,9 @@ class TestSelectModel:
         assert temp == 0.0
 
     def test_invalid_temperature_defaults(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "_has_api_key",
-                            lambda k: k == "ANTHROPIC_API_KEY")
+        monkeypatch.setattr(
+            repairagent, "_has_api_key", lambda k: k == "ANTHROPIC_API_KEY"
+        )
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 1)
         monkeypatch.setattr(repairagent.Prompt, "ask", lambda *a, **k: "not-a-number")
         model, temp = repairagent.select_model()
@@ -669,8 +764,9 @@ class TestSelectModel:
         assert temp == 0.0
 
     def test_index_clamped(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "_has_api_key",
-                            lambda k: k == "OPENAI_API_KEY")
+        monkeypatch.setattr(
+            repairagent, "_has_api_key", lambda k: k == "OPENAI_API_KEY"
+        )
         # huge index -> clamped to custom (last) -> prompts for model name
         n = len(repairagent.OPENAI_MODELS) + 1
         monkeypatch.setattr(repairagent.IntPrompt, "ask", lambda *a, **k: 999)
@@ -688,6 +784,7 @@ class TestSelectModel:
 # ===========================================================================
 # select_bugs
 # ===========================================================================
+
 
 class TestSelectBugs:
     def test_manual(self, monkeypatch):
@@ -750,6 +847,7 @@ class TestSelectBugs:
 # execute_run
 # ===========================================================================
 
+
 class TestExecuteRun:
     def test_no_defects4j_exits(self, monkeypatch):
         monkeypatch.setattr(repairagent, "setup_defects4j_env", lambda: None)
@@ -759,59 +857,59 @@ class TestExecuteRun:
 
     def test_success_path(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "setup_defects4j_env", lambda: None)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/defects4j")
-        monkeypatch.setattr(repairagent, "generate_commands_descriptions",
-                            lambda: None)
-        monkeypatch.setattr(repairagent, "increment_experiment",
-                            lambda: str(tmp_path / "experiment_1"))
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/defects4j")
+        monkeypatch.setattr(repairagent, "generate_commands_descriptions", lambda: None)
+        monkeypatch.setattr(
+            repairagent, "increment_experiment", lambda: str(tmp_path / "experiment_1")
+        )
         ran = []
-        monkeypatch.setattr(repairagent, "run_single_bug",
-                            lambda *a, **k: ran.append(a))
+        monkeypatch.setattr(
+            repairagent, "run_single_bug", lambda *a, **k: ran.append(a)
+        )
         repairagent.execute_run([("Chart", "1"), ("Math", "2")], "gpt", "hp", 7, 0.0)
         assert len(ran) == 2
 
     def test_agent_systemexit_zero_is_ok(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "setup_defects4j_env", lambda: None)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/defects4j")
-        monkeypatch.setattr(repairagent, "generate_commands_descriptions",
-                            lambda: None)
-        monkeypatch.setattr(repairagent, "increment_experiment",
-                            lambda: str(tmp_path / "exp"))
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/defects4j")
+        monkeypatch.setattr(repairagent, "generate_commands_descriptions", lambda: None)
+        monkeypatch.setattr(
+            repairagent, "increment_experiment", lambda: str(tmp_path / "exp")
+        )
 
         def fake_run_single(*a, **k):
             raise SystemExit(0)
+
         monkeypatch.setattr(repairagent, "run_single_bug", fake_run_single)
         # should NOT raise — SystemExit(0) treated as normal completion
         repairagent.execute_run([("Chart", "1")], "gpt", "hp", 5)
 
     def test_agent_systemexit_one_reraises(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "setup_defects4j_env", lambda: None)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/defects4j")
-        monkeypatch.setattr(repairagent, "generate_commands_descriptions",
-                            lambda: None)
-        monkeypatch.setattr(repairagent, "increment_experiment",
-                            lambda: str(tmp_path / "exp"))
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/defects4j")
+        monkeypatch.setattr(repairagent, "generate_commands_descriptions", lambda: None)
+        monkeypatch.setattr(
+            repairagent, "increment_experiment", lambda: str(tmp_path / "exp")
+        )
 
         def fake_run_single(*a, **k):
             raise SystemExit(1)
+
         monkeypatch.setattr(repairagent, "run_single_bug", fake_run_single)
         with pytest.raises(SystemExit):
             repairagent.execute_run([("Chart", "1")], "gpt", "hp", 5)
 
     def test_exception_recorded_as_failed(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "setup_defects4j_env", lambda: None)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/defects4j")
-        monkeypatch.setattr(repairagent, "generate_commands_descriptions",
-                            lambda: None)
-        monkeypatch.setattr(repairagent, "increment_experiment",
-                            lambda: str(tmp_path / "exp"))
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/defects4j")
+        monkeypatch.setattr(repairagent, "generate_commands_descriptions", lambda: None)
+        monkeypatch.setattr(
+            repairagent, "increment_experiment", lambda: str(tmp_path / "exp")
+        )
 
         def fake_run_single(*a, **k):
             raise RuntimeError("boom")
+
         monkeypatch.setattr(repairagent, "run_single_bug", fake_run_single)
         # exception is caught and recorded; no raise
         repairagent.execute_run([("Chart", "1")], "gpt", "hp", 5)
@@ -821,6 +919,7 @@ class TestExecuteRun:
 # run_in_docker
 # ===========================================================================
 
+
 class TestRunInDocker:
     def test_no_docker_exits(self, monkeypatch):
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: None)
@@ -829,8 +928,7 @@ class TestRunInDocker:
 
     def test_image_present_runs(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/docker")
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
         calls = []
 
         def fake_run(cmd, *a, **k):
@@ -838,6 +936,7 @@ class TestRunInDocker:
             if "images" in cmd:
                 return _completed(0, stdout="abc123")  # image exists
             return _completed(0)
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-1")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-2")
@@ -851,11 +950,11 @@ class TestRunInDocker:
 
     def test_image_missing_builds(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/docker")
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
         rec = {}
-        monkeypatch.setattr(repairagent, "build_docker_image",
-                            lambda: rec.update(built=True))
+        monkeypatch.setattr(
+            repairagent, "build_docker_image", lambda: rec.update(built=True)
+        )
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-1")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-2")
@@ -864,24 +963,24 @@ class TestRunInDocker:
             if "images" in cmd:
                 return _completed(0, stdout="")  # image missing
             return _completed(0)
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
         assert rec.get("built") is True
 
     def test_image_missing_decline_exits(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/docker")
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: False)
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: _completed(0, stdout=""))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda cmd, *a, **k: _completed(0, stdout="")
+        )
         with pytest.raises(SystemExit):
             repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
 
     def test_keys_loaded_from_env_file(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/docker")
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         (tmp_path / ".env").write_text(
@@ -894,6 +993,7 @@ class TestRunInDocker:
             if "images" in cmd:
                 return _completed(0, stdout="img")
             return _completed(0)
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
         run_cmd = calls[-1]
@@ -906,13 +1006,16 @@ class TestRunInDocker:
 # Misc small helpers
 # ===========================================================================
 
+
 class TestMiscHelpers:
     def test_display_environment_runs(self):
         # smoke: just ensure it renders without error
-        repairagent.display_environment({
-            "Python 3.10+": (True, "3.11"),
-            "Java (JDK)": (False, "not found"),
-        })
+        repairagent.display_environment(
+            {
+                "Python 3.10+": (True, "3.11"),
+                "Java (JDK)": (False, "not found"),
+            }
+        )
 
     def test_is_defects4j_initialized(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
@@ -925,24 +1028,33 @@ class TestMiscHelpers:
     def test_build_docker_image(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         calls = []
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: calls.append(cmd) or _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess,
+            "run",
+            lambda cmd, *a, **k: calls.append(cmd) or _completed(0),
+        )
         repairagent.build_docker_image()
         assert calls and calls[0][0] == "docker"
 
     def test_generate_commands_descriptions(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         calls = []
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: calls.append(cmd) or _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess,
+            "run",
+            lambda cmd, *a, **k: calls.append(cmd) or _completed(0),
+        )
         repairagent.generate_commands_descriptions()
         assert calls and "construct_commands_descriptions.py" in calls[0][-1]
 
     def test_checkout_bug(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         captured = {}
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: captured.update(cmd=cmd) or _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess,
+            "run",
+            lambda cmd, *a, **k: captured.update(cmd=cmd) or _completed(0),
+        )
         repairagent.checkout_bug("Chart", "3")
         assert "defects4j checkout" in captured["cmd"]
         assert "Chart" in captured["cmd"]
@@ -952,6 +1064,7 @@ class TestMiscHelpers:
 
         def boom(cmd, *a, **k):
             raise subprocess.CalledProcessError(1, cmd)
+
         monkeypatch.setattr(repairagent.subprocess, "run", boom)
         with pytest.raises(subprocess.CalledProcessError):
             repairagent.checkout_bug("Chart", "3")
@@ -959,16 +1072,18 @@ class TestMiscHelpers:
     def test_install_python_requirements_success(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         (tmp_path / "requirements-core.txt").write_text("click\n")
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(0)
+        )
         assert repairagent.install_python_requirements() is True
 
     def test_install_python_requirements_failure(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         # no core file -> uses requirements.txt
         (tmp_path / "requirements.txt").write_text("click\n")
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(1))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(1)
+        )
         assert repairagent.install_python_requirements() is False
 
     def test_install_system_packages_no_apt(self, monkeypatch):
@@ -983,15 +1098,17 @@ class TestMiscHelpers:
     def test_install_system_packages_success(self, monkeypatch):
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/apt-get")
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(0)
+        )
         assert repairagent.install_system_packages(["perl"]) is True
 
     def test_install_system_packages_update_fails(self, monkeypatch):
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/apt-get")
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda *a, **k: _completed(1))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda *a, **k: _completed(1)
+        )
         assert repairagent.install_system_packages(["perl"]) is False
 
 
@@ -999,32 +1116,31 @@ class TestMiscHelpers:
 # install_all_dependencies orchestrator
 # ===========================================================================
 
+
 class TestInstallAllDependencies:
     def test_all_present(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "detect_missing_system_packages",
-                            lambda: [])
+        monkeypatch.setattr(repairagent, "detect_missing_system_packages", lambda: [])
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: True)
         monkeypatch.setattr(repairagent, "is_defects4j_initialized", lambda: True)
         assert repairagent.install_all_dependencies() is True
 
     def test_missing_all_user_installs(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "detect_missing_system_packages",
-                            lambda: [("perl", "Perl")])
-        monkeypatch.setattr(repairagent, "install_system_packages",
-                            lambda pkgs: True)
+        monkeypatch.setattr(
+            repairagent, "detect_missing_system_packages", lambda: [("perl", "Perl")]
+        )
+        monkeypatch.setattr(repairagent, "install_system_packages", lambda pkgs: True)
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: False)
-        monkeypatch.setattr(repairagent, "install_python_requirements",
-                            lambda: True)
+        monkeypatch.setattr(repairagent, "install_python_requirements", lambda: True)
         monkeypatch.setattr(repairagent, "is_defects4j_initialized", lambda: False)
         monkeypatch.setattr(repairagent, "install_defects4j", lambda: True)
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: True)
         assert repairagent.install_all_dependencies() is True
 
     def test_missing_user_declines(self, monkeypatch):
-        monkeypatch.setattr(repairagent, "detect_missing_system_packages",
-                            lambda: [("perl", "Perl")])
-        monkeypatch.setattr(repairagent, "install_system_packages",
-                            lambda pkgs: False)
+        monkeypatch.setattr(
+            repairagent, "detect_missing_system_packages", lambda: [("perl", "Perl")]
+        )
+        monkeypatch.setattr(repairagent, "install_system_packages", lambda pkgs: False)
         monkeypatch.setattr(repairagent, "_check_python_packages", lambda: False)
         monkeypatch.setattr(repairagent, "is_defects4j_initialized", lambda: False)
         monkeypatch.setattr(repairagent.Confirm, "ask", lambda *a, **k: False)
@@ -1035,15 +1151,19 @@ class TestInstallAllDependencies:
 # setup_api_keys
 # ===========================================================================
 
+
 class TestSetupApiKeys:
     def test_openai_choice(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         # stub the set_api_key module functions
         import set_api_key
-        monkeypatch.setattr(set_api_key, "set_env_var",
-                            lambda *a, **k: None, raising=False)
-        monkeypatch.setattr(set_api_key, "replace_placeholder",
-                            lambda *a, **k: None, raising=False)
+
+        monkeypatch.setattr(
+            set_api_key, "set_env_var", lambda *a, **k: None, raising=False
+        )
+        monkeypatch.setattr(
+            set_api_key, "replace_placeholder", lambda *a, **k: None, raising=False
+        )
         # Prompt: provider "1", then the key
         prompts = iter(["1", "sk-openai-key"])
         monkeypatch.setattr(repairagent.Prompt, "ask", lambda *a, **k: next(prompts))
@@ -1056,10 +1176,13 @@ class TestSetupApiKeys:
     def test_both_choice(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
         import set_api_key
-        monkeypatch.setattr(set_api_key, "set_env_var",
-                            lambda *a, **k: None, raising=False)
-        monkeypatch.setattr(set_api_key, "replace_placeholder",
-                            lambda *a, **k: None, raising=False)
+
+        monkeypatch.setattr(
+            set_api_key, "set_env_var", lambda *a, **k: None, raising=False
+        )
+        monkeypatch.setattr(
+            set_api_key, "replace_placeholder", lambda *a, **k: None, raising=False
+        )
         prompts = iter(["3", "sk-o", "sk-a"])
         monkeypatch.setattr(repairagent.Prompt, "ask", lambda *a, **k: next(prompts))
         provider = repairagent.setup_api_keys()
@@ -1069,6 +1192,7 @@ class TestSetupApiKeys:
 # ===========================================================================
 # install_defects4j
 # ===========================================================================
+
 
 class TestInstallDefects4j:
     def test_full_success(self, monkeypatch, tmp_path):
@@ -1081,8 +1205,7 @@ class TestInstallDefects4j:
             (tmp_path / "data" / sub).mkdir(parents=True)
             (tmp_path / "data" / sub / "x.txt").write_text("data")
 
-        monkeypatch.setattr(repairagent.shutil, "which",
-                            lambda x: "/usr/bin/cpanm")
+        monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/cpanm")
 
         def fake_run(cmd, *a, **k):
             if cmd[:2] == ["git", "clone"]:
@@ -1095,13 +1218,15 @@ class TestInstallDefects4j:
                 binp.mkdir(parents=True, exist_ok=True)
                 (binp / "defects4j").write_text("#!/bin/sh\n")
             return _completed(0)
+
         monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
         assert repairagent.install_defects4j() is True
 
     def test_clone_fails(self, monkeypatch, tmp_path):
         monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: _completed(1))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda cmd, *a, **k: _completed(1)
+        )
         assert repairagent.install_defects4j() is False
 
     def test_already_cloned_no_cpanm_init_missing(self, monkeypatch, tmp_path):
@@ -1111,8 +1236,9 @@ class TestInstallDefects4j:
         (d4j_dir / ".git").mkdir(parents=True)  # already cloned
         # no cpanm available, no init.sh -> returns False at step 4
         monkeypatch.setattr(repairagent.shutil, "which", lambda x: None)
-        monkeypatch.setattr(repairagent.subprocess, "run",
-                            lambda cmd, *a, **k: _completed(0))
+        monkeypatch.setattr(
+            repairagent.subprocess, "run", lambda cmd, *a, **k: _completed(0)
+        )
         assert repairagent.install_defects4j() is False
 
 
@@ -1122,9 +1248,11 @@ class TestInstallDefects4j:
 def test_has_api_key_detects_export_and_spaced_and_quoted_forms(monkeypatch, tmp_path):
     monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    for content in ('export OPENAI_API_KEY=sk-real\n',
-                    'OPENAI_API_KEY = sk-real\n',
-                    'OPENAI_API_KEY="sk-real"\n'):
+    for content in (
+        "export OPENAI_API_KEY=sk-real\n",
+        "OPENAI_API_KEY = sk-real\n",
+        'OPENAI_API_KEY="sk-real"\n',
+    ):
         (tmp_path / ".env").write_text(content)
         assert repairagent._has_api_key("OPENAI_API_KEY") is True, content
 
@@ -1134,7 +1262,7 @@ def test_run_in_docker_forwards_export_form_key(monkeypatch, tmp_path):
     monkeypatch.setattr(repairagent.shutil, "which", lambda x: "/usr/bin/docker")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    (tmp_path / ".env").write_text('export OPENAI_API_KEY=sk-fromfile\n')
+    (tmp_path / ".env").write_text("export OPENAI_API_KEY=sk-fromfile\n")
     calls = []
 
     def fake_run(cmd, *a, **k):
@@ -1142,15 +1270,19 @@ def test_run_in_docker_forwards_export_form_key(monkeypatch, tmp_path):
         if "images" in cmd:
             return _completed(0, stdout="img")
         return _completed(0)
+
     monkeypatch.setattr(repairagent.subprocess, "run", fake_run)
     repairagent.run_in_docker([("Chart", "1")], "gpt", "hp", 5)
     assert "OPENAI_API_KEY=sk-fromfile" in calls[-1]
 
 
-def test_setup_defects4j_env_prepends_bin_despite_superstring_path_entry(monkeypatch, tmp_path):
+def test_setup_defects4j_env_prepends_bin_despite_superstring_path_entry(
+    monkeypatch, tmp_path
+):
     # A different PATH dir that merely has d4j_bin as a prefix must not suppress
     # prepending the real bin (membership is per-entry, not substring).
     import os
+
     monkeypatch.setattr(repairagent, "SCRIPT_DIR", tmp_path)
     d4j_bin = str(tmp_path / "defects4j" / "framework" / "bin")
     monkeypatch.setenv("PATH", d4j_bin + "_other" + os.pathsep + "/usr/bin")

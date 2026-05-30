@@ -39,12 +39,16 @@ class Msg:
 
 
 def assistant_cmd(name, args=None, thoughts="reasoning-text"):
-    return json.dumps({"thoughts": thoughts, "command": {"name": name, "args": args or {}}})
+    return json.dumps(
+        {"thoughts": thoughts, "command": {"name": name, "args": args or {}}}
+    )
 
 
 def bind_validate(fake):
     """Wire self.validate_command_parsing to the real (file-reading) implementation."""
-    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(fake, cd)
+    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(
+        fake, cd
+    )
     return fake
 
 
@@ -105,12 +109,16 @@ def test_construct_search_context_populated():
 
 
 def test_construct_extracted_methods_context_empty():
-    out = BaseAgent.construct_extracted_methods_context(SimpleNamespace(extracted_methods=[]))
+    out = BaseAgent.construct_extracted_methods_context(
+        SimpleNamespace(extracted_methods=[])
+    )
     assert "No extracted methods so far." in out
 
 
 def test_construct_extracted_methods_context_populated():
-    fake = SimpleNamespace(extracted_methods=[{"result": "METHOD-CODE-A"}, {"result": "METHOD-CODE-B"}])
+    fake = SimpleNamespace(
+        extracted_methods=[{"result": "METHOD-CODE-A"}, {"result": "METHOD-CODE-B"}]
+    )
     out = BaseAgent.construct_extracted_methods_context(fake)
     assert "METHOD-CODE-A" in out
     assert "METHOD-CODE-B" in out
@@ -123,7 +131,9 @@ def test_construct_similar_calls_context_empty():
 
 def test_construct_similar_calls_context_populated():
     fake = SimpleNamespace(
-        similar_calls=[{"code_snippet": "SNIP", "file_path": "F.java", "result": "CALLS"}]
+        similar_calls=[
+            {"code_snippet": "SNIP", "file_path": "F.java", "result": "CALLS"}
+        ]
     )
     out = BaseAgent.construct_similar_calls_context(fake)
     assert "Code snippet: SNIP" in out
@@ -162,7 +172,9 @@ def test_construct_bug_report_context_populated_no_failing_test_code():
 
 
 def test_construct_commands_history_context_empty():
-    out = BaseAgent.construct_commands_history_context(SimpleNamespace(commands_history=[]))
+    out = BaseAgent.construct_commands_history_context(
+        SimpleNamespace(commands_history=[])
+    )
     # nothing appended when empty
     assert out == "## The list of commands you have executed so far:\n"
 
@@ -185,7 +197,9 @@ def test_construct_human_feedback_context_populated():
 
 
 def test_construct_generated_methods_context_empty():
-    out = BaseAgent.construct_generated_methods_context(SimpleNamespace(generated_methods=None))
+    out = BaseAgent.construct_generated_methods_context(
+        SimpleNamespace(generated_methods=None)
+    )
     assert "No AI generated code yet." in out
 
 
@@ -213,15 +227,29 @@ def test_construct_context_prompt_aggregates_sections():
         history=[],
     )
     # bind the sub-methods that construct_context_prompt calls on self
-    fake.construct_hypothesises_context = lambda: BaseAgent.construct_hypothesises_context(fake)
-    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(fake)
+    fake.construct_hypothesises_context = (
+        lambda: BaseAgent.construct_hypothesises_context(fake)
+    )
+    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(
+        fake
+    )
     fake.construct_fixes_context = lambda: BaseAgent.construct_fixes_context(fake)
     fake.construct_search_context = lambda: BaseAgent.construct_search_context(fake)
-    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(fake)
-    fake.construct_commands_history_context = lambda: BaseAgent.construct_commands_history_context(fake)
-    fake.construct_similar_calls_context = lambda: BaseAgent.construct_similar_calls_context(fake)
-    fake.construct_extracted_methods_context = lambda: BaseAgent.construct_extracted_methods_context(fake)
-    fake.construct_generated_methods_context = lambda: BaseAgent.construct_generated_methods_context(fake)
+    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(
+        fake
+    )
+    fake.construct_commands_history_context = (
+        lambda: BaseAgent.construct_commands_history_context(fake)
+    )
+    fake.construct_similar_calls_context = (
+        lambda: BaseAgent.construct_similar_calls_context(fake)
+    )
+    fake.construct_extracted_methods_context = (
+        lambda: BaseAgent.construct_extracted_methods_context(fake)
+    )
+    fake.construct_generated_methods_context = (
+        lambda: BaseAgent.construct_generated_methods_context(fake)
+    )
     fake.construct_unknown_commands = lambda: BaseAgent.construct_unknown_commands(fake)
 
     out = BaseAgent.construct_context_prompt(fake)
@@ -245,12 +273,20 @@ def test_construct_fix_query_includes_task_and_fix_format():
         similar_calls=None,
         prompt_dictionary={"fix format": ["FIX-FORMAT-LINE-1", "FIX-FORMAT-LINE-2"]},
     )
-    fake.construct_hypothesises_context = lambda: BaseAgent.construct_hypothesises_context(fake)
-    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(fake)
+    fake.construct_hypothesises_context = (
+        lambda: BaseAgent.construct_hypothesises_context(fake)
+    )
+    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(
+        fake
+    )
     fake.construct_fixes_context = lambda: BaseAgent.construct_fixes_context(fake)
     fake.construct_search_context = lambda: BaseAgent.construct_search_context(fake)
-    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(fake)
-    fake.construct_similar_calls_context = lambda: BaseAgent.construct_similar_calls_context(fake)
+    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(
+        fake
+    )
+    fake.construct_similar_calls_context = (
+        lambda: BaseAgent.construct_similar_calls_context(fake)
+    )
 
     out = BaseAgent.construct_fix_query(fake)
     assert "Suggest a list of 10 possible fixes" in out
@@ -265,7 +301,12 @@ def test_construct_fix_query_includes_task_and_fix_format():
 def test_construct_generated_methods_pairs_with_next_result():
     cmd = assistant_cmd(
         "AI_generate_method_code",
-        {"project_name": "Lang", "bug_index": 1, "filepath": "Foo.java", "method_name": "doIt"},
+        {
+            "project_name": "Lang",
+            "bug_index": 1,
+            "filepath": "Foo.java",
+            "method_name": "doIt",
+        },
     )
     history = [Msg("assistant", cmd), Msg("user", "GENERATED-CODE-RESULT")]
     fake = bind_validate(SimpleNamespace(history=history, generated_methods=None))
@@ -274,7 +315,9 @@ def test_construct_generated_methods_pairs_with_next_result():
 
 
 def test_construct_generated_methods_none_when_no_command():
-    history = [Msg("assistant", assistant_cmd("express_hypothesis", {"hypothesis": "h"}))]
+    history = [
+        Msg("assistant", assistant_cmd("express_hypothesis", {"hypothesis": "h"}))
+    ]
     fake = bind_validate(SimpleNamespace(history=history, generated_methods=None))
     BaseAgent.construct_generated_methods(fake)
     assert fake.generated_methods is None
@@ -308,7 +351,12 @@ def test_construct_suggested_fixes_collects_write_and_tryfixes():
     )
     try_cmd = assistant_cmd(
         "try_fixes",
-        {"fixes_list": [{"changes_dicts": {"line": 2}}, {"changes_dicts": {"line": 3}}]},
+        {
+            "fixes_list": [
+                {"changes_dicts": {"line": 2}},
+                {"changes_dicts": {"line": 3}},
+            ]
+        },
     )
     history = [Msg("assistant", write_cmd), Msg("assistant", try_cmd)]
     fake = bind_validate(SimpleNamespace(history=history, suggested_fixes=None))
@@ -339,7 +387,10 @@ def test_construct_human_feedback_collects_system_feedback():
 def test_construct_unknown_commands_collects_flagged_commands():
     history = [
         Msg("assistant", assistant_cmd("weird_cmd", {})),
-        Msg("user", "weird_cmd is an unknown command. Do not try to use this command again."),
+        Msg(
+            "user",
+            "weird_cmd is an unknown command. Do not try to use this command again.",
+        ),
     ]
     fake = SimpleNamespace(history=history)
     out = BaseAgent.construct_unknown_commands(fake)
@@ -369,7 +420,12 @@ def test_construct_search_queries_pairs_keywords_and_result():
 def test_construct_similar_calls_pairs_snippet_and_result():
     cmd = assistant_cmd(
         "extract_similar_functions_calls",
-        {"project_name": "Lang", "bug_index": 1, "file_path": "F.java", "code_snippet": "SNIP"},
+        {
+            "project_name": "Lang",
+            "bug_index": 1,
+            "file_path": "F.java",
+            "code_snippet": "SNIP",
+        },
     )
     history = [Msg("assistant", cmd), Msg("user", "SIMILAR-RESULT")]
     fake = bind_validate(SimpleNamespace(history=history, similar_calls=None))
@@ -382,7 +438,12 @@ def test_construct_similar_calls_pairs_snippet_and_result():
 def test_construct_extracted_methods_pairs_method_and_result():
     cmd = assistant_cmd(
         "extract_method_code",
-        {"project_name": "Lang", "bug_index": 1, "filepath": "F.java", "method_name": "m"},
+        {
+            "project_name": "Lang",
+            "bug_index": 1,
+            "filepath": "F.java",
+            "method_name": "m",
+        },
     )
     history = [Msg("assistant", cmd), Msg("user", "EXTRACT-RESULT")]
     fake = bind_validate(SimpleNamespace(history=history, extracted_methods=None))
@@ -491,7 +552,9 @@ def test_save_to_json_appends_dict_to_existing_file(tmp_path):
 def test_save_to_json_appends_fixes_dict_flattened_to_existing(tmp_path):
     path = str(tmp_path / "out.json")
     json.dump([{"a": 1}], open(path, "w"))
-    ret = BaseAgent.save_to_json(SimpleNamespace(), path, {"mutations": [{"m": 1}, {"m": 2}]})
+    ret = BaseAgent.save_to_json(
+        SimpleNamespace(), path, {"mutations": [{"m": 1}, {"m": 2}]}
+    )
     assert ret == [{"m": 1}, {"m": 2}]
     assert json.load(open(path)) == [{"a": 1}, {"m": 1}, {"m": 2}]
 
@@ -538,14 +601,26 @@ def _mutation_self(populated):
             bug_index="1",
             prompt_dictionary={"fix format": ["FMT"]},
         )
-    fake.construct_hypothesises_context = lambda: BaseAgent.construct_hypothesises_context(fake)
-    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(fake)
+    fake.construct_hypothesises_context = (
+        lambda: BaseAgent.construct_hypothesises_context(fake)
+    )
+    fake.construct_read_files_context = lambda: BaseAgent.construct_read_files_context(
+        fake
+    )
     fake.construct_fixes_context = lambda: BaseAgent.construct_fixes_context(fake)
     fake.construct_search_context = lambda: BaseAgent.construct_search_context(fake)
-    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(fake)
-    fake.construct_commands_history_context = lambda: BaseAgent.construct_commands_history_context(fake)
-    fake.construct_similar_calls_context = lambda: BaseAgent.construct_similar_calls_context(fake)
-    fake.construct_extracted_methods_context = lambda: BaseAgent.construct_extracted_methods_context(fake)
+    fake.construct_bug_report_context = lambda: BaseAgent.construct_bug_report_context(
+        fake
+    )
+    fake.construct_commands_history_context = (
+        lambda: BaseAgent.construct_commands_history_context(fake)
+    )
+    fake.construct_similar_calls_context = (
+        lambda: BaseAgent.construct_similar_calls_context(fake)
+    )
+    fake.construct_extracted_methods_context = (
+        lambda: BaseAgent.construct_extracted_methods_context(fake)
+    )
     return fake
 
 
@@ -671,7 +746,11 @@ def test_load_context_restores_all_attributes(tmp_path, monkeypatch):
     assert fake.cycles_remaining == 3
     assert fake.current_state == "collect information to fix the bug"
     assert fake.read_files == {"F": {"1,2": "x"}}
-    assert fake.test_results if hasattr(fake, "test_results") else fake.tests_results == "TESTS"
+    assert (
+        fake.test_results
+        if hasattr(fake, "test_results")
+        else fake.tests_results == "TESTS"
+    )
     assert fake.hyperparams == {"x": 1}
     assert fake.history == [{"role": "user", "content": "hi"}]
 
@@ -681,7 +760,9 @@ def test_load_context_restores_all_attributes(tmp_path, monkeypatch):
 # ===========================================================================
 def test_on_before_think_returns_prompt_unchanged_without_plugins():
     model_name = "gpt-4"
-    prompt = ChatSequence.for_model(model_name, [Message("system", "sys"), Message("user", "u")])
+    prompt = ChatSequence.for_model(
+        model_name, [Message("system", "sys"), Message("user", "u")]
+    )
     fake = SimpleNamespace(
         config=SimpleNamespace(plugins=[]),
         ai_config=SimpleNamespace(prompt_generator=object()),
@@ -695,7 +776,9 @@ def test_on_before_think_returns_prompt_unchanged_without_plugins():
 
 def test_on_before_think_inserts_capable_plugin_response():
     model_name = "gpt-4"
-    prompt = ChatSequence.for_model(model_name, [Message("system", "sys"), Message("user", "u")])
+    prompt = ChatSequence.for_model(
+        model_name, [Message("system", "sys"), Message("user", "u")]
+    )
 
     class Plugin:
         def can_handle_on_planning(self):
@@ -719,7 +802,9 @@ def test_on_before_think_inserts_capable_plugin_response():
 
 def test_on_before_think_skips_incapable_plugin():
     model_name = "gpt-4"
-    prompt = ChatSequence.for_model(model_name, [Message("system", "sys"), Message("user", "u")])
+    prompt = ChatSequence.for_model(
+        model_name, [Message("system", "sys"), Message("user", "u")]
+    )
 
     class Plugin:
         def can_handle_on_planning(self):
@@ -740,7 +825,9 @@ def test_on_before_think_skips_incapable_plugin():
 
 def test_on_before_think_stops_when_token_limit_exceeded():
     model_name = "gpt-4"
-    prompt = ChatSequence.for_model(model_name, [Message("system", "sys"), Message("user", "u")])
+    prompt = ChatSequence.for_model(
+        model_name, [Message("system", "sys"), Message("user", "u")]
+    )
 
     class Plugin:
         def can_handle_on_planning(self):
@@ -802,53 +889,118 @@ def _permissive(fake):
 
 
 def test_construct_read_files_no_stale_result_on_trailing_command():
-    fake = _permissive(SimpleNamespace(read_files={}, history=[
-        Msg("assistant", assistant_cmd("read_range", {"startline": 1, "endline": 2, "filepath": "F.java"})),
-        Msg("user", "BODY-A"),
-        Msg("assistant", assistant_cmd("read_range", {"startline": 5, "endline": 6, "filepath": "G.java"})),
-    ]))
+    fake = _permissive(
+        SimpleNamespace(
+            read_files={},
+            history=[
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "read_range",
+                        {"startline": 1, "endline": 2, "filepath": "F.java"},
+                    ),
+                ),
+                Msg("user", "BODY-A"),
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "read_range",
+                        {"startline": 5, "endline": 6, "filepath": "G.java"},
+                    ),
+                ),
+            ],
+        )
+    )
     BaseAgent.construct_read_files(fake)
     assert "F.java" in fake.read_files
     assert "G.java" not in fake.read_files  # trailing cmd has no result -> not recorded
 
 
 def test_construct_generated_methods_no_stale_result():
-    fake = _permissive(SimpleNamespace(generated_methods=None, history=[
-        Msg("assistant", assistant_cmd("AI_generate_method_code", {"method_name": "m1"})),
-        Msg("user", "GEN-1"),
-        Msg("assistant", assistant_cmd("AI_generate_method_code", {"method_name": "m2"})),
-    ]))
+    fake = _permissive(
+        SimpleNamespace(
+            generated_methods=None,
+            history=[
+                Msg(
+                    "assistant",
+                    assistant_cmd("AI_generate_method_code", {"method_name": "m1"}),
+                ),
+                Msg("user", "GEN-1"),
+                Msg(
+                    "assistant",
+                    assistant_cmd("AI_generate_method_code", {"method_name": "m2"}),
+                ),
+            ],
+        )
+    )
     BaseAgent.construct_generated_methods(fake)
     assert fake.generated_methods == ("m1", "GEN-1")  # not ("m2", "GEN-1")
 
 
 def test_construct_search_queries_no_stale_result():
-    fake = _permissive(SimpleNamespace(search_queries=[], history=[
-        Msg("assistant", assistant_cmd("search_code_base", {"key_words": "a"})),
-        Msg("user", "RES-A"),
-        Msg("assistant", assistant_cmd("search_code_base", {"key_words": "b"})),
-    ]))
+    fake = _permissive(
+        SimpleNamespace(
+            search_queries=[],
+            history=[
+                Msg("assistant", assistant_cmd("search_code_base", {"key_words": "a"})),
+                Msg("user", "RES-A"),
+                Msg("assistant", assistant_cmd("search_code_base", {"key_words": "b"})),
+            ],
+        )
+    )
     BaseAgent.construct_search_queries(fake)
     assert fake.search_queries == [{"query": "a", "result": "RES-A"}]
 
 
 def test_construct_similar_calls_no_stale_result():
-    fake = _permissive(SimpleNamespace(similar_calls=None, history=[
-        Msg("assistant", assistant_cmd("extract_similar_functions_calls", {"code_snippet": "S1", "file_path": "F"})),
-        Msg("user", "RES-1"),
-        Msg("assistant", assistant_cmd("extract_similar_functions_calls", {"code_snippet": "S2", "file_path": "G"})),
-    ]))
+    fake = _permissive(
+        SimpleNamespace(
+            similar_calls=None,
+            history=[
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "extract_similar_functions_calls",
+                        {"code_snippet": "S1", "file_path": "F"},
+                    ),
+                ),
+                Msg("user", "RES-1"),
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "extract_similar_functions_calls",
+                        {"code_snippet": "S2", "file_path": "G"},
+                    ),
+                ),
+            ],
+        )
+    )
     BaseAgent.construct_similar_calls(fake)
     assert len(fake.similar_calls) == 1
     assert fake.similar_calls[0]["code_snippet"] == "S1"
 
 
 def test_construct_extracted_methods_no_stale_result():
-    fake = _permissive(SimpleNamespace(extracted_methods=[], history=[
-        Msg("assistant", assistant_cmd("extract_method_code", {"method_name": "m1", "filepath": "F"})),
-        Msg("user", "RES-1"),
-        Msg("assistant", assistant_cmd("extract_method_code", {"method_name": "m2", "filepath": "G"})),
-    ]))
+    fake = _permissive(
+        SimpleNamespace(
+            extracted_methods=[],
+            history=[
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "extract_method_code", {"method_name": "m1", "filepath": "F"}
+                    ),
+                ),
+                Msg("user", "RES-1"),
+                Msg(
+                    "assistant",
+                    assistant_cmd(
+                        "extract_method_code", {"method_name": "m2", "filepath": "G"}
+                    ),
+                ),
+            ],
+        )
+    )
     BaseAgent.construct_extracted_methods(fake)
     assert len(fake.extracted_methods) == 1
     assert fake.extracted_methods[0]["method_name"] == "m1"
@@ -859,19 +1011,23 @@ def test_construct_extracted_methods_no_stale_result():
 # ===========================================================================
 def _switchable(history, state="collect information to understand the bug"):
     fake = SimpleNamespace(history=history, current_state=state)
+
     def upd(s):
         fake.current_state = s
+
     fake.update_prompt_state = upd
     return fake
 
 
 def test_switch_state_no_indexerror_when_last_message_is_assistant():
     # History ending with an assistant command (result not appended yet).
-    fake = _switchable([
-        Msg("user", "u1"),
-        Msg("user", "u2"),
-        Msg("assistant", assistant_cmd("read_range", {})),
-    ])
+    fake = _switchable(
+        [
+            Msg("user", "u1"),
+            Msg("user", "u2"),
+            Msg("assistant", assistant_cmd("read_range", {})),
+        ]
+    )
     BaseAgent.switch_state(fake)  # must not raise IndexError
     assert fake.current_state == "collect information to understand the bug"
 
@@ -879,9 +1035,11 @@ def test_switch_state_no_indexerror_when_last_message_is_assistant():
 def test_switch_state_inspects_first_message():
     # Assistant command at index 0, its result (with a transition trigger) at 1.
     trigger = "\n **Note:** You are automatically switched to the state 'trying out candidate fixes'"
-    fake = _switchable([
-        Msg("assistant", assistant_cmd("write_fix", {})),
-        Msg("user", "fix applied." + trigger),
-    ])
+    fake = _switchable(
+        [
+            Msg("assistant", assistant_cmd("write_fix", {})),
+            Msg("user", "fix applied." + trigger),
+        ]
+    )
     BaseAgent.switch_state(fake)
     assert fake.current_state == "trying out candidate fixes"

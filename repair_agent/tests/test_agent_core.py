@@ -30,7 +30,7 @@ from types import SimpleNamespace
 import pytest
 
 import autogpt.agents.agent as agent_mod
-from autogpt.agents.agent import Agent, extract_command, execute_command
+from autogpt.agents.agent import Agent, execute_command, extract_command
 from autogpt.llm.base import Message
 
 
@@ -172,13 +172,17 @@ def test_construct_base_prompt_no_budget_just_delegates(monkeypatch):
     sentinel = object()
     # super().construct_base_prompt returns this sentinel
     monkeypatch.setattr(
-        agent_mod.BaseAgent, "construct_base_prompt",
+        agent_mod.BaseAgent,
+        "construct_base_prompt",
         lambda self, *a, **k: (a, k, sentinel),
     )
     # ApiManager().get_total_budget() == 0 -> no budget message appended
     monkeypatch.setattr(
-        agent_mod, "ApiManager",
-        lambda: SimpleNamespace(get_total_budget=lambda: 0.0, get_total_cost=lambda: 0.0),
+        agent_mod,
+        "ApiManager",
+        lambda: SimpleNamespace(
+            get_total_budget=lambda: 0.0, get_total_cost=lambda: 0.0
+        ),
     )
     self = _LightAgent()
     a, k, ret = self.construct_base_prompt("tp_id")
@@ -212,8 +216,11 @@ def test_construct_base_prompt_appends_budget_message(monkeypatch, remaining, fr
     budget = 10.0
     cost = budget - remaining
     monkeypatch.setattr(
-        agent_mod, "ApiManager",
-        lambda: SimpleNamespace(get_total_budget=lambda: budget, get_total_cost=lambda: cost),
+        agent_mod,
+        "ApiManager",
+        lambda: SimpleNamespace(
+            get_total_budget=lambda: budget, get_total_cost=lambda: cost
+        ),
     )
     self = _LightAgent()
     ret = self.construct_base_prompt("tp_id")
@@ -226,13 +233,17 @@ def test_construct_base_prompt_appends_budget_message(monkeypatch, remaining, fr
 def test_construct_base_prompt_negative_remaining_clamped_to_zero(monkeypatch):
     captured = {}
     monkeypatch.setattr(
-        agent_mod.BaseAgent, "construct_base_prompt",
+        agent_mod.BaseAgent,
+        "construct_base_prompt",
         lambda self, *a, **k: captured.setdefault("k", k),
     )
     # cost > budget -> remaining negative -> clamped to 0 -> "BUDGET EXCEEDED"
     monkeypatch.setattr(
-        agent_mod, "ApiManager",
-        lambda: SimpleNamespace(get_total_budget=lambda: 1.0, get_total_cost=lambda: 5.0),
+        agent_mod,
+        "ApiManager",
+        lambda: SimpleNamespace(
+            get_total_budget=lambda: 1.0, get_total_cost=lambda: 5.0
+        ),
     )
     monkeypatch.setattr(agent_mod.logger, "debug", lambda *a, **k: None)
     self = _LightAgent()
@@ -273,7 +284,7 @@ def test_on_before_think_logs_two_cycles(monkeypatch):
     # Two log_cycle calls: full history, then current context.
     assert len(calls) == 2
     assert calls[0][0] == "RepairAgent"  # ai_name for full history
-    assert calls[1][0] == "Lang_1"       # project_name + "_" + bug_index
+    assert calls[1][0] == "Lang_1"  # project_name + "_" + bug_index
 
 
 # ===========================================================================
@@ -313,7 +324,9 @@ def test_save_plausible_patch_writes_file(patch_self):
 def test_save_plausible_patch_dedups_identical(patch_self):
     fake, exp_dir = patch_self
     Agent._save_plausible_patch(fake, {"line": 10}, source="mutant")
-    Agent._save_plausible_patch(fake, {"line": 10}, source="mutant")  # identical -> skipped
+    Agent._save_plausible_patch(
+        fake, {"line": 10}, source="mutant"
+    )  # identical -> skipped
     with open(_plausible_path(exp_dir)) as f:
         data = json.load(f)
     assert len(data) == 1
@@ -332,7 +345,9 @@ def test_save_plausible_patch_appends_distinct(patch_self):
 # ===========================================================================
 # Agent.execute  (dispatch branches)
 # ===========================================================================
-def _execute_self(monkeypatch, history_summary="hist", token_limit=100000, plugins=None):
+def _execute_self(
+    monkeypatch, history_summary="hist", token_limit=100000, plugins=None
+):
     """Build a fake self for Agent.execute with sub-objects it touches."""
     added = []
 
@@ -372,7 +387,9 @@ def test_execute_human_feedback(monkeypatch):
 
 
 def test_execute_normal_command(monkeypatch):
-    monkeypatch.setattr(agent_mod, "execute_command", lambda command_name, arguments, agent: "ok-result")
+    monkeypatch.setattr(
+        agent_mod, "execute_command", lambda command_name, arguments, agent: "ok-result"
+    )
     fake = _execute_self(monkeypatch)
     result = Agent.execute(fake, "run_test", {"project_name": "Lang"}, None)
     assert result == "Command run_test returned: ok-result"
@@ -411,7 +428,11 @@ def test_execute_plugins_pre_and_post(monkeypatch):
         def post_command(self, name, result):
             return result + " [post]"
 
-    monkeypatch.setattr(agent_mod, "execute_command", lambda command_name, arguments, agent: f"got {command_name}")
+    monkeypatch.setattr(
+        agent_mod,
+        "execute_command",
+        lambda command_name, arguments, agent: f"got {command_name}",
+    )
     monkeypatch.setattr(agent_mod, "count_string_tokens", lambda s, m: 1)
     fake = _execute_self(monkeypatch, plugins=[Plugin()])
     result = Agent.execute(fake, "orig_cmd", {}, None)
@@ -421,7 +442,9 @@ def test_execute_plugins_pre_and_post(monkeypatch):
 
 
 def test_execute_tracks_plausible_patch(monkeypatch):
-    monkeypatch.setattr(agent_mod, "execute_command", lambda **k: "Tests run: 1, 0 failing test")
+    monkeypatch.setattr(
+        agent_mod, "execute_command", lambda **k: "Tests run: 1, 0 failing test"
+    )
     monkeypatch.setattr(agent_mod, "count_string_tokens", lambda s, m: 1)
     saved = {}
     fake = _execute_self(monkeypatch)
@@ -481,31 +504,44 @@ def test_parse_write_fix_triggers_mutation_pipeline(monkeypatch, write_fix_self)
     fake, exp_dir = write_fix_self
 
     # Stub out everything the write_fix branch calls in the agent module namespace.
-    monkeypatch.setattr(agent_mod, "get_detailed_list_of_buggy_lines", lambda p, b: ["buggy line"])
+    monkeypatch.setattr(
+        agent_mod, "get_detailed_list_of_buggy_lines", lambda p, b: ["buggy line"]
+    )
     # query_for_mutants returns a markdown-fenced JSON list of one mutant.
     monkeypatch.setattr(
-        agent_mod, "query_for_mutants",
+        agent_mod,
+        "query_for_mutants",
         lambda prompt, llm: '```json\n[{"mutant": "do X"}]\n```',
     )
     constructed = {}
     monkeypatch.setattr(
-        agent_mod, "construct_fix_command",
-        lambda m, p, b: constructed.setdefault("cmd", {"command": {"name": "write_fix", "args": {}}}),
+        agent_mod,
+        "construct_fix_command",
+        lambda m, p, b: constructed.setdefault(
+            "cmd", {"command": {"name": "write_fix", "args": {}}}
+        ),
     )
     exec_calls = []
     monkeypatch.setattr(
-        agent_mod, "execute_command",
-        lambda name, args, agent: exec_calls.append((name, args)) or "Tests run: 1, 0 failing test",
+        agent_mod,
+        "execute_command",
+        lambda name, args, agent: exec_calls.append((name, args))
+        or "Tests run: 1, 0 failing test",
     )
     saved = {}
-    fake._save_plausible_patch = lambda patch_data, source: saved.update(patch=patch_data, source=source)
+    fake._save_plausible_patch = lambda patch_data, source: saved.update(
+        patch=patch_data, source=source
+    )
     saved_json = {}
     fake.save_to_json = lambda path, data: saved_json.update(path=path, data=data)
 
     content = json.dumps(
         {
             "thoughts": "fixing",
-            "command": {"name": "write_fix", "args": {"changes_dicts": [{"line": 1, "code": "x"}]}},
+            "command": {
+                "name": "write_fix",
+                "args": {"changes_dicts": [{"line": 1, "code": "x"}]},
+            },
         }
     )
     name, args, reply = Agent.parse_and_process_response(fake, _Resp(content))
@@ -578,7 +614,10 @@ def test_parse_underscore_split_persists_for_non_autoinject(parse_self):
     content = json.dumps(
         {
             "thoughts": "t",
-            "command": {"name": "run_test", "args": {"project_name": "Foo_bar_baz", "bug_index": 7}},
+            "command": {
+                "name": "run_test",
+                "args": {"project_name": "Foo_bar_baz", "bug_index": 7},
+            },
         }
     )
     name, args, reply = Agent.parse_and_process_response(parse_self, _Resp(content))
@@ -619,7 +658,10 @@ def test_parse_post_planning_plugin_invoked(parse_self):
 
     parse_self.config.plugins = [Plugin()]
     content = json.dumps(
-        {"thoughts": "t", "command": {"name": "express_hypothesis", "args": {"hypothesis": "h"}}}
+        {
+            "thoughts": "t",
+            "command": {"name": "express_hypothesis", "args": {"hypothesis": "h"}},
+        }
     )
     name, args, reply = Agent.parse_and_process_response(parse_self, _Resp(content))
     assert name == "express_hypothesis"
@@ -632,7 +674,9 @@ def test_parse_write_fix_mutation_error_is_swallowed(monkeypatch, write_fix_self
     # query_for_mutants raising would propagate (it's outside the try); instead return
     # malformed content so json_repair / processing inside the try block fails and the
     # broad ``except`` logs+swallows it without crashing parse_and_process_response.
-    monkeypatch.setattr(agent_mod, "query_for_mutants", lambda prompt, llm: "not json at all")
+    monkeypatch.setattr(
+        agent_mod, "query_for_mutants", lambda prompt, llm: "not json at all"
+    )
 
     def boom(*a, **k):
         raise RuntimeError("construct failed")

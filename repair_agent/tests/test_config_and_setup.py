@@ -8,6 +8,7 @@ Config(name=..., description=...) is enough to construct.
 No network/LLM calls are made here: get_openai_credentials / get_azure_credentials
 are pure dict-builders that only read attributes off the model.
 """
+
 import os
 
 import pytest
@@ -251,6 +252,7 @@ def test_chat_messages_enabled_default_preserved(monkeypatch, tmp_path):
     # Model default is True; build_config_from_env must not silently flip it to
     # False when CHAT_MESSAGES_ENABLED is unset.
     from autogpt.config.config import ConfigBuilder
+
     monkeypatch.delenv("CHAT_MESSAGES_ENABLED", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.delenv("USE_AZURE", raising=False)

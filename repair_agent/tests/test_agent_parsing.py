@@ -21,8 +21,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from autogpt.agents.base import BaseAgent
 from autogpt.agents.agent import Agent
+from autogpt.agents.base import BaseAgent
 
 
 # ---------------------------------------------------------------------------
@@ -38,24 +38,39 @@ class Msg:
 
 def assistant_cmd(name, args=None, thoughts="t"):
     """Build assistant message content carrying a JSON command dict."""
-    return json.dumps({"thoughts": thoughts, "command": {"name": name, "args": args or {}}})
+    return json.dumps(
+        {"thoughts": thoughts, "command": {"name": name, "args": args or {}}}
+    )
 
 
 # ===========================================================================
 # (A) base.py : detect_command_repetition
 # ===========================================================================
 def test_detect_command_repetition_true_when_repeated():
-    ref = {"command": {"name": "run_test", "args": {"project_name": "Lang", "bug_index": 1}}}
+    ref = {
+        "command": {
+            "name": "run_test",
+            "args": {"project_name": "Lang", "bug_index": 1},
+        }
+    }
     history = [
         Msg("user", "do something"),
-        Msg("assistant", assistant_cmd("run_test", {"project_name": "Lang", "bug_index": 1})),
+        Msg(
+            "assistant",
+            assistant_cmd("run_test", {"project_name": "Lang", "bug_index": 1}),
+        ),
     ]
     fake_self = SimpleNamespace(history=history)
     assert BaseAgent.detect_command_repetition(fake_self, ref) is True
 
 
 def test_detect_command_repetition_false_when_different():
-    ref = {"command": {"name": "run_test", "args": {"project_name": "Lang", "bug_index": 1}}}
+    ref = {
+        "command": {
+            "name": "run_test",
+            "args": {"project_name": "Lang", "bug_index": 1},
+        }
+    }
     history = [
         Msg("assistant", assistant_cmd("read_range", {"filepath": "a.java"})),
     ]
@@ -82,7 +97,10 @@ def test_detect_command_repetition_returns_false_on_bad_ref():
 # (A) base.py : handle_command_repetition
 # ===========================================================================
 def test_handle_command_repetition_empty_strategy_returns_empty():
-    assert BaseAgent.handle_command_repetition(SimpleNamespace(), {"command": "x"}, "") == ""
+    assert (
+        BaseAgent.handle_command_repetition(SimpleNamespace(), {"command": "x"}, "")
+        == ""
+    )
 
 
 def test_handle_command_repetition_restrict_mentions_command():
@@ -94,7 +112,9 @@ def test_handle_command_repetition_restrict_mentions_command():
 
 
 def test_handle_command_repetition_top3_does_not_need_command():
-    out = BaseAgent.handle_command_repetition(SimpleNamespace(), {"command": "x"}, "TOP3")
+    out = BaseAgent.handle_command_repetition(
+        SimpleNamespace(), {"command": "x"}, "TOP3"
+    )
     assert "three commands" in out
 
 
@@ -165,7 +185,11 @@ def test_switch_state_transition_to_trying_candidate_fixes():
 
 
 def test_switch_state_no_transition_when_no_trigger():
-    history = [Msg("user", "filler"), Msg("assistant", "cmd"), Msg("user", "nothing special here")]
+    history = [
+        Msg("user", "filler"),
+        Msg("assistant", "cmd"),
+        Msg("user", "nothing special here"),
+    ]
     fake = _bind_update_prompt_state(_switch_self(history))
     BaseAgent.switch_state(fake)
     # unchanged
@@ -182,7 +206,12 @@ def test_validate_command_parsing_accepts_exact_args():
 
 
 def test_validate_command_parsing_rejects_extra_or_missing_args():
-    cmd = {"command": {"name": "express_hypothesis", "args": {"hypothesis": "h", "extra": 1}}}
+    cmd = {
+        "command": {
+            "name": "express_hypothesis",
+            "args": {"hypothesis": "h", "extra": 1},
+        }
+    }
     assert BaseAgent.validate_command_parsing(SimpleNamespace(), cmd) is False
 
 
@@ -211,15 +240,24 @@ def test_construct_read_files_pairs_command_with_next_result():
     ]
     fake = SimpleNamespace(history=history, read_files={})
     # construct_read_files calls self.validate_command_parsing internally.
-    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(fake, cd)
+    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(
+        fake, cd
+    )
     BaseAgent.construct_read_files(fake)
     assert fake.read_files == {"Foo.java": {"10,20": "lines 10-20 content here"}}
 
 
 def test_construct_read_files_empty_when_no_read_commands():
-    history = [Msg("assistant", assistant_cmd("run_test", {"project_name": "Lang", "bug_index": 1}))]
+    history = [
+        Msg(
+            "assistant",
+            assistant_cmd("run_test", {"project_name": "Lang", "bug_index": 1}),
+        )
+    ]
     fake = SimpleNamespace(history=history, read_files={})
-    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(fake, cd)
+    fake.validate_command_parsing = lambda cd: BaseAgent.validate_command_parsing(
+        fake, cd
+    )
     BaseAgent.construct_read_files(fake)
     assert fake.read_files == {}
 
@@ -331,7 +369,10 @@ def test_parse_known_command_without_autoinject_keeps_provided_args(parse_self):
     content = json.dumps(
         {
             "thoughts": "hypothesis",
-            "command": {"name": "express_hypothesis", "args": {"hypothesis": "h1", "junk": 2}},
+            "command": {
+                "name": "express_hypothesis",
+                "args": {"hypothesis": "h1", "junk": 2},
+            },
         }
     )
     name, args, reply = Agent.parse_and_process_response(parse_self, _resp(content))
@@ -346,7 +387,10 @@ def test_parse_unmatched_arg_mapped_to_substring_ref(parse_self):
     content = json.dumps(
         {
             "thoughts": "classes",
-            "command": {"name": "get_classes_and_methods", "args": {"file": "Foo.java"}},
+            "command": {
+                "name": "get_classes_and_methods",
+                "args": {"file": "Foo.java"},
+            },
         }
     )
     name, args, reply = Agent.parse_and_process_response(parse_self, _resp(content))
@@ -368,8 +412,15 @@ def test_fuzzy_arg_maps_name_to_method_name_not_project_name(parse_self):
     # "name" is a substring of BOTH project_name and method_name; it must bind to
     # method_name (the specific field the model means), not project_name (which is
     # auto-injected and would silently drop the value).
-    content = json.dumps({"thoughts": "x", "command": {
-        "name": "extract_method_code", "args": {"file": "Foo.java", "name": "doStuff"}}})
+    content = json.dumps(
+        {
+            "thoughts": "x",
+            "command": {
+                "name": "extract_method_code",
+                "args": {"file": "Foo.java", "name": "doStuff"},
+            },
+        }
+    )
     _, _, reply = Agent.parse_and_process_response(parse_self, _resp(content))
     a = reply["command"]["args"]
     assert a.get("method_name") == "doStuff"
@@ -380,8 +431,15 @@ def test_fuzzy_arg_maps_name_to_method_name_not_project_name(parse_self):
 def test_fuzzy_arg_no_collapse_two_args_onto_one_ref(parse_self):
     # "changed" and "lines" both fuzzy-match changed_lines; the ref must be filled
     # by exactly one (first match wins), never silently last-writer-clobbered.
-    content = json.dumps({"thoughts": "x", "command": {
-        "name": "write_range", "args": {"filepath": "F.java", "changed": "AAA", "lines": "BBB"}}})
+    content = json.dumps(
+        {
+            "thoughts": "x",
+            "command": {
+                "name": "write_range",
+                "args": {"filepath": "F.java", "changed": "AAA", "lines": "BBB"},
+            },
+        }
+    )
     _, _, reply = Agent.parse_and_process_response(parse_self, _resp(content))
     a = reply["command"]["args"]
     assert a.get("changed_lines") == "AAA"

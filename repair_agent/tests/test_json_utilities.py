@@ -8,6 +8,7 @@ The LLM is never called here: extract_dict_from_response is pure string/JSON
 handling, and validate_dict only reads a bundled schema file plus a small Config
 stand-in (SimpleNamespace).
 """
+
 from types import SimpleNamespace
 
 import pytest
@@ -60,7 +61,7 @@ def test_whitespace_only_returns_empty_dict():
 
 
 def test_json_object_embedded_in_prose_code_block():
-    resp = "Here is my answer:\n```json\n{\"a\": 1, \"c\": true}\n```\nDone."
+    resp = 'Here is my answer:\n```json\n{"a": 1, "c": true}\n```\nDone.'
     assert extract_dict_from_response(resp) == {"a": 1, "c": True}
 
 

@@ -13,16 +13,14 @@ Strategy:
   calls (run_defects4j_tests, extract_fail_report, LLM, etc.).
 """
 
-import os
 import json
-from types import SimpleNamespace
-
 import logging
+import os
+from types import SimpleNamespace
 
 import pytest
 
 import tests.conftest  # noqa: F401  (sys.path / chdir / langchain stubs)
-
 from autogpt.commands import defects4j as d
 from autogpt.logs import logger as _project_logger
 
@@ -51,6 +49,7 @@ def quiet_info_logging():
 # create_deletion_template
 # ===========================================================================
 
+
 def _make_buggy_lines(base_dir, name, index, content):
     bdir = os.path.join(base_dir, "defects4j", "buggy-lines")
     os.makedirs(bdir, exist_ok=True)
@@ -62,7 +61,9 @@ def _make_buggy_lines(base_dir, name, index, content):
 
 def test_create_deletion_template_builds_deletions(tmp_path, monkeypatch):
     _make_buggy_lines(
-        str(tmp_path), "Lang", "1",
+        str(tmp_path),
+        "Lang",
+        "1",
         "src/Foo.java#10#int x;\nsrc/Foo.java#12#int y;\nsrc/Bar.java#5#z;\n",
     )
     monkeypatch.chdir(tmp_path)
@@ -76,9 +77,13 @@ def test_create_deletion_template_builds_deletions(tmp_path, monkeypatch):
     assert by_file["src/Foo.java"]["modifications"] == []
 
 
-def test_create_deletion_template_returns_none_on_fault_of_omission(tmp_path, monkeypatch):
+def test_create_deletion_template_returns_none_on_fault_of_omission(
+    tmp_path, monkeypatch
+):
     _make_buggy_lines(
-        str(tmp_path), "Lang", "2",
+        str(tmp_path),
+        "Lang",
+        "2",
         "src/Foo.java#10#FAULT_OF_OMISSION\n",
     )
     monkeypatch.chdir(tmp_path)
@@ -89,6 +94,7 @@ def test_create_deletion_template_returns_none_on_fault_of_omission(tmp_path, mo
 # we_are_running_in_a_docker_container : always True (early return)
 # ===========================================================================
 
+
 def test_we_are_running_in_a_docker_container_always_true():
     assert d.we_are_running_in_a_docker_container() is True
 
@@ -96,6 +102,7 @@ def test_we_are_running_in_a_docker_container_always_true():
 # ===========================================================================
 # extract_function_calls
 # ===========================================================================
+
 
 def test_extract_function_calls_basic():
     code = "void m() { foo(1); bar(a, b); }"
@@ -122,6 +129,7 @@ def test_extract_function_calls_none(quiet_info_logging):
 # (logic file covers the happy path; cover the missing-file branch here)
 # ===========================================================================
 
+
 def test_get_list_of_buggy_lines_missing_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert d.get_list_of_buggy_lines("Nope", "99") == []
@@ -129,7 +137,9 @@ def test_get_list_of_buggy_lines_missing_file(tmp_path, monkeypatch):
 
 def test_get_list_of_buggy_lines_parses_line_numbers(tmp_path, monkeypatch):
     _make_buggy_lines(
-        str(tmp_path), "Lang", "3",
+        str(tmp_path),
+        "Lang",
+        "3",
         "src/Foo.java#10#int x;\nsrc/Foo.java#22#int y;\n",
     )
     monkeypatch.chdir(tmp_path)
@@ -140,6 +150,7 @@ def test_get_list_of_buggy_lines_parses_line_numbers(tmp_path, monkeypatch):
 # get_localization
 # ===========================================================================
 
+
 def test_get_localization_no_files_returns_blank(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     out = d.get_localization("Lang", "99")
@@ -148,7 +159,9 @@ def test_get_localization_no_files_returns_blank(tmp_path, monkeypatch):
 
 def test_get_localization_with_lines_and_methods(tmp_path, monkeypatch):
     _make_buggy_lines(
-        str(tmp_path), "Lang", "1",
+        str(tmp_path),
+        "Lang",
+        "1",
         "src/Foo.java#10#int x;\n",
     )
     mdir = os.path.join(str(tmp_path), "defects4j", "buggy-methods")
@@ -169,6 +182,7 @@ def test_get_localization_with_lines_and_methods(tmp_path, monkeypatch):
 # apply_changes : deletions / modifications / insertions on a real tmp file
 # ===========================================================================
 
+
 def test_apply_changes_deletion_blanks_line(tmp_path):
     f = tmp_path / "F.java"
     f.write_text("a\nb\nc\n")
@@ -179,10 +193,12 @@ def test_apply_changes_deletion_blanks_line(tmp_path):
 def test_apply_changes_modification_similar_line_replaced(tmp_path):
     f = tmp_path / "F.java"
     f.write_text("int x = 1;\n")
-    d.apply_changes({
-        "file_name": str(f),
-        "modifications": [{"line_number": 1, "modified_line": "int x = 2;"}],
-    })
+    d.apply_changes(
+        {
+            "file_name": str(f),
+            "modifications": [{"line_number": 1, "modified_line": "int x = 2;"}],
+        }
+    )
     assert f.read_text() == "int x = 2;\n"
 
 
@@ -190,21 +206,29 @@ def test_apply_changes_modification_dissimilar_skipped(tmp_path):
     # fuzz ratio < 70 -> the modification is skipped, original kept
     f = tmp_path / "F.java"
     f.write_text("int x = 1;\n")
-    d.apply_changes({
-        "file_name": str(f),
-        "modifications": [{"line_number": 1,
-                           "modified_line": "totally different content here zzzzz"}],
-    })
+    d.apply_changes(
+        {
+            "file_name": str(f),
+            "modifications": [
+                {
+                    "line_number": 1,
+                    "modified_line": "totally different content here zzzzz",
+                }
+            ],
+        }
+    )
     assert f.read_text() == "int x = 1;\n"
 
 
 def test_apply_changes_insertion_adds_lines(tmp_path):
     f = tmp_path / "F.java"
     f.write_text("a\nb\n")
-    d.apply_changes({
-        "file_name": str(f),
-        "insertions": [{"line_number": 2, "new_lines": ["x\n", "y\n"]}],
-    })
+    d.apply_changes(
+        {
+            "file_name": str(f),
+            "insertions": [{"line_number": 2, "new_lines": ["x\n", "y\n"]}],
+        }
+    )
     # inserted before original line 2
     assert f.read_text() == "a\nx\ny\nb\n"
 
@@ -212,6 +236,7 @@ def test_apply_changes_insertion_adds_lines(tmp_path):
 # ===========================================================================
 # extract_fail_report : parse the failing_tests file
 # ===========================================================================
+
 
 def test_extract_fail_report_groups_cases(buggy_project_dir):
     b = buggy_project_dir
@@ -243,6 +268,7 @@ def test_extract_fail_report_missing_separator_raises(buggy_project_dir):
 # list_files : recursive .java collection
 # ===========================================================================
 
+
 def test_list_files_only_java(tmp_path):
     (tmp_path / "A.java").write_text("class A{}")
     (tmp_path / "b.txt").write_text("x")
@@ -261,6 +287,7 @@ def test_list_files_empty(tmp_path):
 # ===========================================================================
 # get_classes_and_methods : javalang parsing on a real file
 # ===========================================================================
+
 
 def _write_java_project(b, rel, code):
     """Write java file under project dir and create a files_index.txt so that
@@ -291,6 +318,7 @@ def test_get_classes_and_methods_returns_class_methods(buggy_project_dir):
 # ===========================================================================
 # search_code_base : keyword match against method names
 # ===========================================================================
+
 
 def test_search_code_base_matches_method_names(buggy_project_dir):
     b = buggy_project_dir
@@ -324,6 +352,7 @@ def test_search_code_base_no_match(buggy_project_dir):
 # execute_read_range / read_range
 # ===========================================================================
 
+
 def test_execute_read_range_returns_numbered_lines(buggy_project_dir):
     b = buggy_project_dir
     (b.project_dir / "F.java").write_text("l1\nl2\nl3\nl4\n")
@@ -344,23 +373,30 @@ def test_read_range_delegates(buggy_project_dir, monkeypatch):
     sentinel = "READ_RESULT"
     monkeypatch.setattr(d, "execute_read_range", lambda *a, **k: sentinel)
     b = buggy_project_dir
-    assert d.read_range(b.project_name, b.bug_index, "F.java", 1, 2, b.agent) == sentinel
+    assert (
+        d.read_range(b.project_name, b.bug_index, "F.java", 1, 2, b.agent) == sentinel
+    )
 
 
 # ===========================================================================
 # execute_write_range / write_range : apply changes then run tests (mocked)
 # ===========================================================================
 
+
 def test_execute_write_range_applies_and_runs_tests(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
     (b.project_dir / "F.java").write_text("int x = 1;\n")
-    monkeypatch.setattr(d, "run_defects4j_tests", lambda *a, **k: "0 failing test cases")
-    changes = [{
-        "file_name": "F.java",
-        "modifications": [{"line_number": 1, "modified_line": "int x = 2;"}],
-        "deletions": [],
-        "insertions": [],
-    }]
+    monkeypatch.setattr(
+        d, "run_defects4j_tests", lambda *a, **k: "0 failing test cases"
+    )
+    changes = [
+        {
+            "file_name": "F.java",
+            "modifications": [{"line_number": 1, "modified_line": "int x = 2;"}],
+            "deletions": [],
+            "insertions": [],
+        }
+    ]
     out = d.execute_write_range(b.project_name, b.bug_index, changes, b.agent)
     assert "Lines written successfully" in out
     assert "0 failing test cases" in out
@@ -377,6 +413,7 @@ def test_write_range_delegates(buggy_project_dir, monkeypatch):
 # write_fix
 # ===========================================================================
 
+
 def test_write_fix_empty_changes(buggy_project_dir):
     b = buggy_project_dir
     b.agent.dummy_fix = True
@@ -384,17 +421,22 @@ def test_write_fix_empty_changes(buggy_project_dir):
     assert "empty" in out.lower()
 
 
-def test_write_fix_missed_buggy_lines_returns_template(buggy_project_dir, monkeypatch, tmp_path):
+def test_write_fix_missed_buggy_lines_returns_template(
+    buggy_project_dir, monkeypatch, tmp_path
+):
     b = buggy_project_dir
     b.agent.dummy_fix = True  # skip the deletion-dummy-fix branch
     # buggy line 10 exists but the fix targets line 99 -> missed lines triggers template
     _make_buggy_lines(str(b.workspace), "Lang", "1", "F.java#10#int x;\n")
     monkeypatch.chdir(b.workspace)
-    changes = [{
-        "file_name": "F.java",
-        "modifications": [{"line_number": "99", "modified_line": "y"}],
-        "deletions": [], "insertions": [],
-    }]
+    changes = [
+        {
+            "file_name": "F.java",
+            "modifications": [{"line_number": "99", "modified_line": "y"}],
+            "deletions": [],
+            "insertions": [],
+        }
+    ]
     out = d.write_fix("Lang", 1, changes, b.agent)
     assert "did not target all the buggy lines" in out
     assert "[10]" in out
@@ -404,10 +446,15 @@ def test_write_fix_dummy_deletion_fixes_all(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
     b.agent.dummy_fix = False
     # deletion template will be non-None
-    monkeypatch.setattr(d, "create_deletion_template",
-                        lambda *a, **k: [{"file_name": "F.java", "deletions": ["1"]}])
+    monkeypatch.setattr(
+        d,
+        "create_deletion_template",
+        lambda *a, **k: [{"file_name": "F.java", "deletions": ["1"]}],
+    )
     monkeypatch.setattr(d, "get_list_of_buggy_lines", lambda *a, **k: [])
-    monkeypatch.setattr(d, "execute_write_range", lambda *a, **k: "result: 0 failing test cases")
+    monkeypatch.setattr(
+        d, "execute_write_range", lambda *a, **k: "result: 0 failing test cases"
+    )
     out = d.write_fix(b.project_name, b.bug_index, [{"file_name": "F.java"}], b.agent)
     assert "Deleting the buggy lines fixed the problem" in out
     assert b.agent.dummy_fix is True
@@ -428,6 +475,7 @@ def test_write_fix_success_path(buggy_project_dir, monkeypatch):
 # try_fixes
 # ===========================================================================
 
+
 def test_try_fixes_empty_list():
     out = d.try_fixes("Lang", 1, [], agent=SimpleNamespace())
     assert "empty" in out.lower()
@@ -435,7 +483,9 @@ def test_try_fixes_empty_list():
 
 def test_try_fixes_list_of_dicts(monkeypatch):
     # when fixes_list[0] is a dict, the whole list is written at once
-    monkeypatch.setattr(d, "execute_write_range", lambda *a, **k: "0 failing test cases")
+    monkeypatch.setattr(
+        d, "execute_write_range", lambda *a, **k: "0 failing test cases"
+    )
     out = d.try_fixes("Lang", 1, [{"file_name": "F.java"}], agent=SimpleNamespace())
     assert "1 of them passed" in out
     assert "[0]" in out
@@ -461,6 +511,7 @@ def test_try_fixes_list_of_lists(monkeypatch):
 # (subprocess mocked at module namespace)
 # ===========================================================================
 
+
 class _FakeProc:
     def __init__(self, returncode=0, stdout="", stderr=""):
         self.returncode = returncode
@@ -473,6 +524,7 @@ def _patch_subprocess_run(monkeypatch, proc, recorder=None):
         if recorder is not None:
             recorder.append((args, kwargs))
         return proc
+
     monkeypatch.setattr(d.subprocess, "run", fake_run)
 
 
@@ -490,7 +542,9 @@ def test_run_checkout_error(buggy_project_dir, monkeypatch):
     assert out == "Error: boom"
 
 
-def test_run_checkout_removes_existing_workspace(make_fake_agent, monkeypatch, tmp_path):
+def test_run_checkout_removes_existing_workspace(
+    make_fake_agent, monkeypatch, tmp_path
+):
     # run_checkout uses a repo-relative auto_gpt_workspace/<folder>
     monkeypatch.chdir(tmp_path)
     agent = make_fake_agent(str(tmp_path))
@@ -517,7 +571,9 @@ def test_run_tests_delegates(buggy_project_dir, monkeypatch):
 
 def test_run_defects4j_tests_build_failed(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
-    _patch_subprocess_run(monkeypatch, _FakeProc(returncode=0, stdout="prefix BUILD FAILED tail"))
+    _patch_subprocess_run(
+        monkeypatch, _FakeProc(returncode=0, stdout="prefix BUILD FAILED tail")
+    )
     monkeypatch.setattr(d, "undo_changes", lambda *a, **k: None)
     out = d.run_defects4j_tests(b.project_name, b.bug_index, b.agent)
     assert out.startswith("BUILD FAILED")
@@ -527,7 +583,9 @@ def test_run_defects4j_tests_build_failed(buggy_project_dir, monkeypatch):
 
 def test_run_defects4j_tests_success_calls_fail_report(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
-    _patch_subprocess_run(monkeypatch, _FakeProc(returncode=0, stdout="OK normal output"))
+    _patch_subprocess_run(
+        monkeypatch, _FakeProc(returncode=0, stdout="OK normal output")
+    )
     monkeypatch.setattr(d, "extract_fail_report", lambda *a, **k: "FAIL_REPORT")
     monkeypatch.setattr(d, "undo_changes", lambda *a, **k: None)
     out = d.run_defects4j_tests(b.project_name, b.bug_index, b.agent)
@@ -537,7 +595,9 @@ def test_run_defects4j_tests_success_calls_fail_report(buggy_project_dir, monkey
 
 def test_run_defects4j_tests_nonzero_build_failed(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
-    _patch_subprocess_run(monkeypatch, _FakeProc(returncode=1, stderr="x BUILD FAILED y"))
+    _patch_subprocess_run(
+        monkeypatch, _FakeProc(returncode=1, stderr="x BUILD FAILED y")
+    )
     monkeypatch.setattr(d, "undo_changes", lambda *a, **k: None)
     out = d.run_defects4j_tests(b.project_name, b.bug_index, b.agent)
     assert out.startswith("BUILD FAILED")
@@ -545,7 +605,9 @@ def test_run_defects4j_tests_nonzero_build_failed(buggy_project_dir, monkeypatch
 
 def test_run_defects4j_tests_nonzero_other_error(buggy_project_dir, monkeypatch):
     b = buggy_project_dir
-    _patch_subprocess_run(monkeypatch, _FakeProc(returncode=2, stderr="some other error"))
+    _patch_subprocess_run(
+        monkeypatch, _FakeProc(returncode=2, stderr="some other error")
+    )
     monkeypatch.setattr(d, "undo_changes", lambda *a, **k: None)
     out = d.run_defects4j_tests(b.project_name, b.bug_index, b.agent)
     assert out == "some other error"
@@ -580,6 +642,7 @@ def test_get_info_delegates(buggy_project_dir, monkeypatch):
 # prepare_command (pure string builder)
 # ===========================================================================
 
+
 def test_prepare_command_contains_expected_tokens():
     cmd = d.prepare_command("ws", "lang_1_buggy")
     assert "lspeclipse" in cmd
@@ -592,6 +655,7 @@ def test_prepare_command_contains_expected_tokens():
 # ===========================================================================
 # prepare_init_file (reads a template json, writes init file)
 # ===========================================================================
+
 
 def test_prepare_init_file_writes_filled_template(tmp_path, monkeypatch):
     template = {
@@ -607,18 +671,25 @@ def test_prepare_init_file_writes_filled_template(tmp_path, monkeypatch):
     project_dir = "lang_1_buggy"
     os.makedirs(os.path.join(str(tmp_path), workspace, project_dir, "lspeclipse"))
     monkeypatch.chdir(tmp_path)
-    d.prepare_init_file("/root", "file:///root", "file:///root/ws", workspace, project_dir)
-    out_path = os.path.join(str(tmp_path), workspace, project_dir, "lspeclipse", "lsp_init_file.json")
+    d.prepare_init_file(
+        "/root", "file:///root", "file:///root/ws", workspace, project_dir
+    )
+    out_path = os.path.join(
+        str(tmp_path), workspace, project_dir, "lspeclipse", "lsp_init_file.json"
+    )
     written = json.load(open(out_path))
     assert written["params"]["rootPath"] == "/root"
     assert written["params"]["rootUri"] == "file:///root"
-    assert written["params"]["initializationOptions"]["workspaceFolders"] == ["file:///root/ws"]
+    assert written["params"]["initializationOptions"]["workspaceFolders"] == [
+        "file:///root/ws"
+    ]
     assert written["params"]["workspaceFolders"][0]["name"] == project_dir
 
 
 # ===========================================================================
 # prepare_lsp_env (subprocess.run mocked)
 # ===========================================================================
+
 
 def test_prepare_lsp_env_invokes_cp(monkeypatch):
     rec = []
@@ -646,6 +717,7 @@ def test_prepare_lsp_env_handles_failure(monkeypatch):
 # ===========================================================================
 # execute_command (Popen mocked)
 # ===========================================================================
+
 
 def test_execute_command_writes_requests(monkeypatch):
     recorded = {"writes": [], "killed": False, "flushed": 0}
@@ -681,6 +753,7 @@ def test_execute_command_writes_requests(monkeypatch):
 # lsp_hover (orchestration; mock nested IO/subprocess)
 # ===========================================================================
 
+
 def test_lsp_hover_returns_output(tmp_path, monkeypatch):
     project_dir = "lang_1_buggy"
     workspace = "ws"
@@ -689,7 +762,9 @@ def test_lsp_hover_returns_output(tmp_path, monkeypatch):
     lspdir = base / workspace / project_dir / "lspeclipse"
     lspdir.mkdir(parents=True)
     (lspdir / "lsp_init_file.json").write_text("{}")
-    (base / workspace / project_dir / "lsp_output.txt").write_text("HOVER RESULT CONTENT")
+    (base / workspace / project_dir / "lsp_output.txt").write_text(
+        "HOVER RESULT CONTENT"
+    )
     monkeypatch.chdir(base)
     monkeypatch.setattr(d, "prepare_command", lambda *a, **k: "cmd")
     monkeypatch.setattr(d, "execute_command", lambda *a, **k: None)
@@ -733,6 +808,7 @@ def test_lsp_hover_empty_output(tmp_path, monkeypatch):
 # ===========================================================================
 # ask_chatgpt (LLM mocked)
 # ===========================================================================
+
 
 class _FakeResponse:
     def __init__(self, content):
@@ -780,6 +856,7 @@ def test_ask_chatgpt_followup(monkeypatch):
 # validate_fix_against_hypothesis (LLM mocked, temperature branching)
 # ===========================================================================
 
+
 def test_validate_fix_against_hypothesis_default_temp(monkeypatch):
     captured = {}
 
@@ -816,6 +893,7 @@ def test_validate_fix_against_hypothesis_gpt5_forces_temp_1(monkeypatch):
 # extract_method_code (antlr) and extract_similar_functions_calls
 # ===========================================================================
 
+
 def test_extract_method_code_returns_body(buggy_project_dir):
     b = buggy_project_dir
     (b.project_dir / "Foo.java").write_text(
@@ -835,7 +913,9 @@ def test_extract_method_code_no_match(buggy_project_dir):
     (b.project_dir / "Foo.java").write_text(
         "public class Foo { public int bar(int x) { return x; } }\n"
     )
-    out = d.extract_method_code(b.project_name, b.bug_index, "Foo.java", "nope", b.agent)
+    out = d.extract_method_code(
+        b.project_name, b.bug_index, "Foo.java", "nope", b.agent
+    )
     # header present, but no candidates
     assert "method name nope" in out
     assert "Implementation candidate" not in out
@@ -844,9 +924,7 @@ def test_extract_method_code_no_match(buggy_project_dir):
 def test_extract_similar_functions_calls_found(buggy_project_dir):
     b = buggy_project_dir
     (b.project_dir / "Foo.java").write_text(
-        "public class Foo {\n"
-        "    void m() { compute(1); compute(2, 3); }\n"
-        "}\n"
+        "public class Foo {\n" "    void m() { compute(1); compute(2, 3); }\n" "}\n"
     )
     out = d.extract_similar_functions_calls(
         b.project_name, b.bug_index, "Foo.java", "compute(1)", b.agent
@@ -855,7 +933,9 @@ def test_extract_similar_functions_calls_found(buggy_project_dir):
     assert "compute(2, 3)" in out
 
 
-def test_extract_similar_functions_calls_no_calls(buggy_project_dir, quiet_info_logging):
+def test_extract_similar_functions_calls_no_calls(
+    buggy_project_dir, quiet_info_logging
+):
     b = buggy_project_dir
     (b.project_dir / "Foo.java").write_text("public class Foo { int x = 1; }\n")
     out = d.extract_similar_functions_calls(
@@ -867,6 +947,7 @@ def test_extract_similar_functions_calls_no_calls(buggy_project_dir, quiet_info_
 # ===========================================================================
 # extract_function_def_context (uses extract_method_code + tiktoken)
 # ===========================================================================
+
 
 def test_extract_function_def_context_returns_preceding(monkeypatch, tmp_path):
     # workspace is hardcoded to ./auto_gpt_workspace, so build tree there
@@ -881,7 +962,9 @@ def test_extract_function_def_context_returns_preceding(monkeypatch, tmp_path):
     monkeypatch.setattr(d, "preprocess_paths", lambda agent, pn, bi, fp: "Foo.java")
     # extract_method_code returns a STRING; context uses extracted[0] = first char.
     # Make it return a substring present in the file so .find succeeds.
-    monkeypatch.setattr(d, "extract_method_code", lambda *a, **k: "HEADER STUFF\npublic")
+    monkeypatch.setattr(
+        d, "extract_method_code", lambda *a, **k: "HEADER STUFF\npublic"
+    )
     out = d.extract_function_def_context("Lang", 1, "bar", "Foo.java", agent)
     # context is the slice before the found method_body; method_body starts at 0
     assert out == ""
@@ -903,6 +986,7 @@ def test_extract_function_def_context_method_not_found_raises(monkeypatch, tmp_p
 # ===========================================================================
 # auto_complete_functions (LLM mocked, temperature branching)
 # ===========================================================================
+
 
 def test_auto_complete_functions_invokes_llm(monkeypatch):
     captured = {}
@@ -942,6 +1026,7 @@ def test_auto_complete_functions_gpt5_temp(monkeypatch):
 # ===========================================================================
 # extract_test_code
 # ===========================================================================
+
 
 def test_extract_test_code_no_failing_test(buggy_project_dir):
     b = buggy_project_dir
@@ -987,7 +1072,9 @@ def test_get_list_of_buggy_lines_hash_in_code(tmp_path, monkeypatch):
     # number (field 1), not crash via split('#')[-2].
     bdir = tmp_path / "defects4j" / "buggy-lines"
     bdir.mkdir(parents=True)
-    (bdir / "Lang-7.buggy.lines").write_text("src/Foo.java#10#a # b\nsrc/Foo.java#20#x = 1\n")
+    (bdir / "Lang-7.buggy.lines").write_text(
+        "src/Foo.java#10#a # b\nsrc/Foo.java#20#x = 1\n"
+    )
     monkeypatch.chdir(tmp_path)
     assert d.get_list_of_buggy_lines("Lang", "7") == [10, 20]
 
@@ -996,7 +1083,7 @@ def test_extract_function_calls_keeps_prefixed_identifiers():
     code = "void m(){ if (x>0) {} ifPresent(1); whileLoop(2); foo(3); }"
     calls = d.extract_function_calls(code)
     joined = " ".join(calls)
-    assert "ifPresent(1)" in joined   # method call, not the `if` keyword
+    assert "ifPresent(1)" in joined  # method call, not the `if` keyword
     assert "whileLoop(2)" in joined
     assert "foo(3)" in joined
 
@@ -1004,10 +1091,15 @@ def test_extract_function_calls_keeps_prefixed_identifiers():
 def test_apply_changes_insertions_sorted_numerically(tmp_path):
     f = tmp_path / "F.java"
     f.write_text("".join(f"L{i}\n" for i in range(1, 11)))  # L1..L10
-    d.apply_changes({"file_name": str(f), "insertions": [
-        {"line_number": "10", "new_lines": ["INS10\n"]},
-        {"line_number": "2", "new_lines": ["INS2\n"]},
-    ]})
+    d.apply_changes(
+        {
+            "file_name": str(f),
+            "insertions": [
+                {"line_number": "10", "new_lines": ["INS10\n"]},
+                {"line_number": "2", "new_lines": ["INS2\n"]},
+            ],
+        }
+    )
     lines = f.read_text().splitlines()
     # INS2 must be inserted before original L2 (numeric order), not after L10.
     assert lines[1] == "INS2"
