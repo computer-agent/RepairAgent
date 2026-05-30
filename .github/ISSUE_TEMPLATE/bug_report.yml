@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a problem running RepairAgent
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! For a failed repair run, the command, model, and logs
+        below let us reproduce it quickly. Tip: `python3 repairagent.py doctor` prints
+        your environment status.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      placeholder: "python3 repairagent.py run --bugs 'Math 5' --model gpt-4o-mini"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install / run it?
+      options:
+        - Codespaces
+        - VS Code Dev Container
+        - Docker
+        - Local install
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: "gpt-4o-mini, gpt-5-mini, claude-sonnet-4-..., (or Azure deployment)"
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment (`python3 repairagent.py doctor`)
+      description: Paste the output; include OS and Python version.
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: From `experimental_setups/<experiment>/logs` or `.../responses`, plus any traceback.
+      render: shell
